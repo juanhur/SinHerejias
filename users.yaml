@@ -1,6 +1,6 @@
 cookie:
   expiry_days: 1 # 0.000694444
-  key: mellamocarademaso # Must be a string
+  key:  pentalab # Must be a string
   name: pentalab
 credentials:
   usernames:
