@@ -1,5 +1,5 @@
 # Usa una imagen base de Python
-FROM python:3.10
+FROM python:3.11
 
 # Establece el directorio de trabajo dentro del contenedor
 WORKDIR /app
@@ -17,8 +17,9 @@ RUN poetry install --no-root --no-interaction --no-ansi
 
 # Copia el resto del código del proyecto
 COPY . .
+COPY agent.py /usr/local/lib/python3.11/site-packages/langchain/agents/agent.py
 
-# Expone el puerto 8501 para Streamlit
+# Expone el puerto 8501 para Strea
 EXPOSE 9191
 
 # Comando para ejecutar Streamlit
