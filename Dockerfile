@@ -1,3 +1,4 @@
+
 # Usa una imagen base de Python
 FROM python:3.11
 
@@ -12,17 +13,16 @@ COPY .env /app/.env
 # Instala Poetry
 RUN pip install --no-cache-dir poetry
 
-# Instala las dependencias del proyecto
-RUN poetry install --no-root --no-interaction --no-ansi
+# Deshabilita la creación de entornos virtuales y luego instala las dependencias globalmente
+RUN poetry config virtualenvs.create false && poetry install --no-root --no-interaction --no-ansi
 
 # Copia el resto del código del proyecto
 COPY . .
 COPY agent.py /usr/local/lib/python3.11/site-packages/langchain/agents/agent.py
 
-# Expone el puerto 8501 para Strea
+
+# Expone el puerto 9191 para Streamlit
 EXPOSE 9191
 
 # Comando para ejecutar Streamlit
-CMD ["poetry", "run", "streamlit", "run", "front.py", "--server.port", "9191", "--server.address", "0.0.0.0"]
-#CMD ["sh", "-c", "set -a && source .env && poetry run streamlit run front.py --server.port 9191 --server.address 0.0.0.0"]
-
+CMD ["streamlit", "run", "front.py", "--server.port", "9191", "--server.address", "0.0.0.0"]

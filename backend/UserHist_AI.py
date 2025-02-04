@@ -128,6 +128,7 @@ promptfn= '''
 5. Only use the 'DOCs' tool after showing the preliminary table and receiving user approval.
 6. Restrict responses to project-related topics to maintain focus and productivity."
 
+**Cuando se consulte por el nombre de algun  archivo(documento) siempre devuelve el nombre completo(nombre y extension del archivo).**
 chat_name:{chat_name}
 usuario:{usuario}
 
