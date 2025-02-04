@@ -1,47 +1,47 @@
-cookie:
-  expiry_days: 1 # 0.000694444
-  key: mellamocarademaso # Must be a string
-  name: pentalab
-credentials:
-  usernames:
-    admin:
-      email: jhurtado@pentalab.tech
-      failed_login_attempts: 0 # Will be managed automatically
-      first_name: juan
-      last_name: hurtado
-      logged_in: False # Will be managed automatically
-      password: '$2b$12$.Sy0rcIjQPCN/zoHl128GORjxe7ZqKSC06dDnG85pgDnN9c0TOYDK'
-      roles: Administrador 
-    JuanHurtado:
-      email: jhurtado@pentalab.tech
-      failed_login_attempts: 0 # Will be managed automatically
-      first_name: Juan
-      last_name: Hurtado
-      logged_in: False # Will be managed automatically
-      password: '$2b$12$.Sy0rcIjQPCN/zoHl128GORjxe7ZqKSC06dDnG85pgDnN9c0TOYDK'
-      roles: Administrador 
+# cookie:
+#   expiry_days: 1 # 0.000694444
+#   key: mellamocarademaso # Must be a string
+#   name: pentalab
+# credentials:
+#   usernames:
+#     admin:
+#       email: jhurtado@pentalab.tech
+#       failed_login_attempts: 0 # Will be managed automatically
+#       first_name: juan
+#       last_name: hurtado
+#       logged_in: False # Will be managed automatically
+#       password: '$2b$12$.Sy0rcIjQPCN/zoHl128GORjxe7ZqKSC06dDnG85pgDnN9c0TOYDK'
+#       roles: Administrador 
+#     JuanHurtado:
+#       email: jhurtado@pentalab.tech
+#       failed_login_attempts: 0 # Will be managed automatically
+#       first_name: Juan
+#       last_name: Hurtado
+#       logged_in: False # Will be managed automatically
+#       password: '$2b$12$.Sy0rcIjQPCN/zoHl128GORjxe7ZqKSC06dDnG85pgDnN9c0TOYDK'
+#       roles: Administrador 
       
-    TatianaPerez:
-      email: jhurtado@pentalab.tech
-      failed_login_attempts: 0 # Will be managed automatically
-      first_name: Tatiana
-      last_name: Perez
-      logged_in: False # Will be managed automatically
-      password: '$2b$12$mwfxj37CoGOOPIS0Ptmci.GVx9/ZHIAcMAcEgPyiFBGfsjlxThOuO'
-      roles: Usuario
-    LaizCalderon:
-      email: jhurtado@pentalab.tech
-      failed_login_attempts: 0 # Will be managed automatically
-      first_name: Laiz
-      last_name: Calderon
-      logged_in: False # Will be managed automatically
-      password: '$2b$12$mwfxj37CoGOOPIS0Ptmci.GVx9/ZHIAcMAcEgPyiFBGfsjlxThOuO'
-      roles:  Usuario 
-    JohannaSamaniego:
-      email: jhurtado@pentalab.tech
-      failed_login_attempts: 0 # Will be managed automatically
-      first_name: Johanna
-      last_name: Samaniego
-      logged_in: False # Will be managed automatically
-      password: '$2b$12$mwfxj37CoGOOPIS0Ptmci.GVx9/ZHIAcMAcEgPyiFBGfsjlxThOuO'
-      roles: Usuario 
+#     TatianaPerez:
+#       email: jhurtado@pentalab.tech
+#       failed_login_attempts: 0 # Will be managed automatically
+#       first_name: Tatiana
+#       last_name: Perez
+#       logged_in: False # Will be managed automatically
+#       password: '$2b$12$mwfxj37CoGOOPIS0Ptmci.GVx9/ZHIAcMAcEgPyiFBGfsjlxThOuO'
+#       roles: Usuario
+#     LaizCalderon:
+#       email: jhurtado@pentalab.tech
+#       failed_login_attempts: 0 # Will be managed automatically
+#       first_name: Laiz
+#       last_name: Calderon
+#       logged_in: False # Will be managed automatically
+#       password: '$2b$12$mwfxj37CoGOOPIS0Ptmci.GVx9/ZHIAcMAcEgPyiFBGfsjlxThOuO'
+#       roles:  Usuario 
+#     JohannaSamaniego:
+#       email: jhurtado@pentalab.tech
+#       failed_login_attempts: 0 # Will be managed automatically
+#       first_name: Johanna
+#       last_name: Samaniego
+#       logged_in: False # Will be managed automatically
+#       password: '$2b$12$mwfxj37CoGOOPIS0Ptmci.GVx9/ZHIAcMAcEgPyiFBGfsjlxThOuO'
+#       roles: Usuario 
