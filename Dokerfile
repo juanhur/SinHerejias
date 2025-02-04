@@ -1,0 +1,25 @@
+# Usa una imagen base con Python
+FROM python:3.11
+
+# Establece el directorio de trabajo dentro del contenedor
+WORKDIR /app
+
+# Instala Poetry globalmente
+RUN pip install --no-cache-dir poetry
+
+# Copia los archivos del proyecto al contenedor
+COPY pyproject.toml poetry.lock ./
+
+# Instala dependencias del proyecto con Poetry
+RUN poetry config virtualenvs.create false && poetry install --no-root --no-interaction --no-ansi
+
+# Copia el resto de los archivos del proyecto
+COPY . .
+
+COPY agent.py /usr/local/lib/python3.11/site-packages/langchain/agents/agent.py
+
+# Expone el puerto de la aplicación (ajústalo si usas otro)
+EXPOSE 8501
+
+# Comando para ejecutar la aplicación (ajústalo según tu caso)
+CMD ["poetry", "run", "streamlit", "run", "front.py"]
