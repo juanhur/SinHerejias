@@ -146,9 +146,11 @@ def Doc(input_data: NuevosTextosInput) ->  str:
         }
     ]
     chat_name=input_data.chat_name
+    chat_name = chat_name.replace("/", "__")
     usuario=input_data.usuario
     id_unico_corto = str(uuid.uuid4())[:8]
     print( nuevos_textos)
+    
     nombre_doc=  "presentacion_"+chat_name+"_"+id_unico_corto+'.pptx'
     ruta_documento=Crear_Diapositiva( nuevos_textos,  nombre_doc,usuario,chat_name)
     val=1

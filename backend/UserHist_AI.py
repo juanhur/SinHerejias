@@ -170,6 +170,7 @@ def DOCs(input_data: HistoriasUsuarioInput, nombre_archivo: str) -> str:
     random = str(uuid.uuid4())[:8]
     usuario=st.session_state.name
     chat_id=input_data.chat_name
+    nombre_archivo = nombre_archivo.replace("/", "__")
     json=codificarIA( chat_id,usuario)
     output = json['output']
     # Abrir el archivo en modo escritura (si no existe, se crea)
