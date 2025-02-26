@@ -7,17 +7,19 @@ import  authenticator.params as params
 from typing import Generator
 from backend.Scrum_AI import Agente_AI
 from backend.UserHist_AI import Agente_UH_AI
+from backend.matriz_priorizacion import crear_matriz,crear_matriz_global
 from PIL import Image
 from docx import Document
 from PyPDF2 import PdfReader
 import extra_streamlit_components as stx
 from Crear_pptx import extract_text_from_pptx
 from Crear_Excel import leer_excel_como_texto
-from  MongoDB import Obtener_Nombres_ChatDB,Cargar_HistorialDB,guardar_nuevo_chatDB,borrar_chatDB, guardar_historial_chatDB,obtener_archivo_gridfs,obtener_archivo_excel_gridfs
+from  MongoDB import actualizar_nombre_proyecto,borrar_proyecto,obtener_proyectos,Obtener_area,Obtener_Nombres_ChatDB,Cargar_HistorialDB,guardar_nuevo_chatDB,borrar_chatDB, guardar_historial_chatDB,obtener_archivo_gridfs,obtener_archivo_excel_gridfs
 import time
+from collections import defaultdict
 # Página 1: User History
 def user_history_page(user:str,logo):
-    st.title("User History 🤖")
+    st.title("User History 📝")
     AI="U_History"
     mensajeinicial="""🎉 ¡Bienvenido a la ventana del agente para la creación de historias de usuario!  
 El objetivo de esta herramienta es ayudarte a elaborar un documento **Excel** con historias de usuario para tu proyecto, basado en la metodología **Scrum**. Este proceso es interactivo y está diseñado para recopilar toda la información necesaria paso a paso.  
@@ -258,7 +260,7 @@ El chat te guiará a través de los siguientes pasos para estructurar las histor
 
 # Página 2: Levantamiento de Proyectos
 def levantamiento_proyectos_page(user:str,logo):
-    st.title("Levantamiento de Proyectos 📂")
+    st.title("Levantamiento de Proyectos 💡 ")
     mensajeinicial="""🎉 ¡Bienvenido a la ventana del agente para el levantamiento de proyectos!  
 
 El objetivo de esta herramienta es ayudarte a generar un documento estructurado en formato **PowerPoint** para tu proyecto, basado en la metodología **Scrum**. Este proceso es interactivo y está diseñado para recopilar toda la información necesaria paso a paso.  
@@ -459,6 +461,113 @@ Durante el proceso, podrás interactuar con la IA para **ajustar detalles**, rec
             except:
                 st.error(e)
 
+# Página 2: Levantamiento de Proyectos
+def levantamiento_matriz_page(user:str,logo):
+    st.title("Matriz de Priorización 📊")
+    st.sidebar.image(logo, caption="PENTALAB",use_container_width=True)
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "nuevo_p"not in st.session_state:
+        st.session_state.nuevo_p = False
+    tab1, tab2 = st.tabs(["Matriz Priorización / Proyecto", "Matriz Priorización /Global"])
+
+    with tab1:
+        texto_explicativo = """
+        **Matriz de Priorización por Proyecto📊**
+
+        🚀 **¿Qué puedes hacer aquí?**
+
+        - **Cargar el archivo de historias de usuario**: Subir el documento del proyecto para iniciar.
+        - **Ver la información**: Se mostrarán las épicas del proyecto y su codificación.
+        - **Puntuación por esfuerzo y priorización**: Se calculará un peso para cada épica, basado en el análisis de las historias de usuario.
+        - **Tabla editable**: Podrás ingresar las prioridades para cada épica del proyecto.
+
+        🔎 **Consulta las reglas de priorización:**
+            Para conocer los criterios utilizados, haz clic en **"Ver reglas"** en la parte izquierda.
+
+        📝 **Importante**: Los cambios deben hacerse en esta plataforma. Si se editan después de descargar el Excel, **no se guardarán**.
+
+        🔒 **Guardar cambios**:
+        - Haz clic en **"Guardar"** una vez estés seguro de las prioridades.
+
+        🚀 ¡Optimiza tu proceso de priorización y mantén todo organizado!
+        """
+
+        st.write(texto_explicativo)
+        uploaded_file= st.file_uploader("Carga el archivo de Hisotiras de Usuario,para empezar.")
+        if uploaded_file is not None:
+            if  uploaded_file.name.endswith('.xlsx'):
+                file_path = f"./{uploaded_file.name}"
+                with open(file_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                nombre_archivo = uploaded_file.name
+                crear_matriz( uploaded_file)
+            else:
+                st.error(f"el formato del archivo no es compatible,solo se aceptan archivos Excel.")
+    with tab2:
+        texto_explicativo = """
+        🚀 **¿Qué puedes hacer aquí?**
+
+        En el apartado podras editar la matriz de Priorización  de todos los proyectos registrados del area.
+        - Se mostrarán **todas las épicas existentes de cada proyecto** como **columnas**.
+        - Las **filas representan las epicas de los proyectos** y puedes filtrarlas según necesidad.
+        - Para una mejor visualización, puedes **agrandar la tabla** haciendo clic en la **esquina superior derecha**.
+        
+        🔎 **Consulta las reglas de priorización:**
+            Para conocer los criterios utilizados, haz clic en **"Ver reglas"** en la parte izquierda.
+
+            🔒 **Guardar cambios**:
+            - Haz clic en **"Guardar"** una vez estés seguro de las prioridades.
+
+            💡 **Recuerda**: Realiza todas las ediciones en esta plataforma, ya que los cambios fuera de ella **no se reflejarán**.
+
+            📌 **Tip:** En cada columna puedes hacer clic en los **tres puntitos** para **ordenar** los datos o **fijar la columna** según tu necesidad.
+
+            🚀 ¡Optimiza tu proceso de priorización y mantén todo organizado!
+            """
+        st.write(texto_explicativo)
+        crear_matriz_global()
+def mostrar_chats_y_codificaciones(user, AI):
+    st.subheader("Mis Proyectos")
+    proyectos=obtener_proyectos(st.session_state.area)
+    # Diccionario para agrupar por proyecto
+    proyectos_agrupados = defaultdict(lambda: {"Nombre_proyecto": "", "Proyecto": "", "Epicas": []})
+
+    for item in proyectos:
+        clave_proyecto = item["Proyecto"]
+        proyectos_agrupados[clave_proyecto]["Nombre_proyecto"] = item["Nombre_proyecto"]
+        proyectos_agrupados[clave_proyecto]["Proyecto"] = clave_proyecto
+        proyectos_agrupados[clave_proyecto]["Epicas"].append(item["Nombre Épica"])
+
+    # Convertir a lista
+    lista_final = list(proyectos_agrupados.values())
+    for chat in lista_final:
+        with st.container():
+            with st.expander(f"🎯 **{chat['Proyecto']}**", expanded=False):
+                nuevo_nombre = st.text_input("✏️ **Editar Nombre:**", value=chat["Nombre_proyecto"], key=f"nombre_proyecto_{chat['Proyecto']}")
+                st.write(f"**Número de Épicas:** {len(chat['Epicas'])}")
+                
+                epicas_list =chat['Epicas']
+                if epicas_list:
+                    st.write("**Listado de Épicas:**")
+                    for epica in epicas_list:
+                        st.markdown(f"- {epica}")
+                else:
+                    st.write("No hay épicas disponibles.")
+                
+                # Interfaz para modificar y eliminar
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    if st.button("💾 Guardar", key=f"save_{chat['Proyecto']}"):
+                        actualizar_nombre_proyecto(chat["Proyecto"],nuevo_nombre)
+                        st.success("✅Nombre del proyecto actualizado" )#+ resultado)
+                        st.rerun()
+                
+                with col2:
+                    if st.button("🗑️ Eliminar", key=f"delete_{chat['Proyecto']}", help="Eliminar este proyecto"):
+                        borrar_proyecto(chat["Proyecto"])
+                        st.warning("Proyecto eliminado")
+                        st.rerun()
 
 def extraer_nombre_archivo(texto, frase_clave,num):
     # Patrón para buscar el nombre del archivo hasta ".xlsx"
@@ -510,6 +619,12 @@ def leer_archivo_pdf(ruta_archivo):
 def  sub_main(cookie_controller):
     logo_path = r"media/cohete.png"  # Reemplaza con la ruta de tu archivo de imagen
     logo = Image.open(logo_path)
+    if "area" not in st.session_state:
+        resultado=list(Obtener_area(st.session_state["name"]))
+        if resultado  :
+            st.session_state.area = resultado[0]["CodArea"]
+        else:
+            st.session_state.area=None
     if "last_AI" not in st.query_params:
         st.query_params["last_AI"]  = False
     # Mostrar el contenido de la página activa
@@ -517,26 +632,49 @@ def  sub_main(cookie_controller):
         user_history_page(st.session_state["name"],logo)
     elif st.query_params["page"]  == "L_Proyectos":
         levantamiento_proyectos_page(st.session_state["name"],logo)
-    
+    elif st.query_params["page"]  == "M_Priorizacion":
+        levantamiento_matriz_page(st.session_state["name"],logo)
+    elif  st.query_params["page"]  == "Proyectos_Codificaciones":
+        mostrar_chats_y_codificaciones(st.session_state["name"], logo)
     # Navegación entre ventanas
     with st.sidebar:
         # Usar Markdown y CSS para darle forma circular a la imagen en el sidebar
-        st.title("Navegación")
+        st.title("Proceso")
 
-        if st.button("1)💡 Levantamiento de Proyectos"):
-            if st.query_params["page"]!="L_Proyectos":
-                st.session_state.messages = []
-                st.session_state.nuevo_HU=False
-                st.query_params["last_AI"]=True
-                st.query_params["page"]="L_Proyectos"
-            st.rerun() 
-        if st.button("2)📝 User History"):
-            if st.query_params["page"]!="User_history":
-                st.session_state.messages = []
-                st.session_state.nuevo_p=False
-                st.query_params["last_AI"]=True
-                st.query_params["page"]="User_history"
-            st.rerun() 
+        # Obtener la página actual
+        current_page = st.query_params.get("page", "")
+
+        # Configurar botones con estilos dinámicos
+        buttons = [
+            ("1)💡  Levantamiento de Proyectos", "L_Proyectos"),
+            ("2)📝    Historias de Usuario", "User_history"),
+            ("3)📊  Matriz de Priorización", "M_Priorizacion")
+        ]
+
+        for label, page in buttons:
+            button_type = "primary" if current_page == page else "secondary"
+            
+            if st.button(label, use_container_width=True, type=button_type):
+                if current_page != page:
+                    st.session_state.messages = []
+                    st.session_state.nuevo_HU = False
+                    st.session_state.nuevo_p = False
+                    st.query_params["last_AI"] = True
+                    st.query_params["page"] = page
+                    st.rerun()
+        if current_page=="M_Priorizacion":
+            st.divider()
+            with st.sidebar.expander("📜 Ver Reglas"):
+                 st.image("archivos/reglas.png", caption="Reglas de Importancia", use_container_width=True)
+            
+        st.divider()
+        if st.button("🚀 Revisar Proyectos",use_container_width=True, type="tertiary"):
+            st.session_state.messages = []
+            st.session_state.nuevo_HU = False
+            st.session_state.nuevo_p = False
+            st.query_params["last_AI"] = True
+            st.query_params["page"] = "Proyectos_Codificaciones"
+            st.rerun()
         st.divider()
         with st.expander("SESIÓN"):
             st.subheader(st.session_state["name"])
@@ -594,6 +732,13 @@ def main():
                     respuesta,verificacion=Autentificar(username,password)
                     print(respuesta)
                     if verificacion==True:
+                        if "area" not in st.session_state:
+                            st.session_state.area = None
+                        resultado=list(Obtener_area(respuesta))
+                        if resultado  :
+                            st.session_state.area = resultado[0]["CodArea"]
+                        else:
+                            st.session_state.area=None
                         credentials = {"usernames":{
                             'username':username,
                             'password': password,

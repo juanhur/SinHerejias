@@ -1,7 +1,8 @@
 from pptx import Presentation
 from pptx.util import Pt
 import re
-from MongoDB import guardar_presentacion_en_mongo
+from datetime import datetime
+from MongoDB import guardar_presentacion_en_mongo,obtener_ultimo_proyecto
 
 
 def extract_text_from_pptx(uploaded_file):
@@ -91,11 +92,12 @@ def process_paragraph(paragraph_text, paragraph):
 
 
 
-def Crear_Diapositiva(nuevos_textos, ruta_salida,usuario,chat_id):
+def Crear_Diapositiva(nuevos_textos, ruta_salida,usuario,chat_id,area):
     plantilla = r'plantillas/PLANTILLA1.pptx'
     # Cargar la plantilla de PowerPoint
     prs = Presentation(plantilla)
-
+    año,num=obtener_ultimo_proyecto(area)
+    codigo_proyecto=str(area)+"-"+str(año)+"-"+str(num)
     # Iterar a través de las diapositivas en la presentación
     for slide in prs.slides:
         # Iterar a través de los elementos de la diapositiva (shapes)
@@ -114,6 +116,8 @@ def Crear_Diapositiva(nuevos_textos, ruta_salida,usuario,chat_id):
                                 actualizar_texto_simple(cell, "NOMBRE_PROYECTO_IA", texto["NOMBRE_PROYECTO_IA"])
                             elif "JUSTIFICACION_IA" in cell.text:
                                 actualizar_texto_simple(cell, "JUSTIFICACION_IA", texto["JUSTIFICACION_IA"])
+                            elif "COD_IA" in cell.text:
+                                actualizar_texto_simple(cell, "COD_IA", codigo_proyecto)
                             elif "OBJETIVOS_IA" in cell.text:
                                 actualizar_texto_simple(cell, "OBJETIVOS_IA", texto["OBJETIVOS_IA"])
                             elif "RIESGOS_IA" in cell.text:
@@ -128,6 +132,8 @@ def Crear_Diapositiva(nuevos_textos, ruta_salida,usuario,chat_id):
                                 actualizar_texto_simple(cell, "RECURSOS_IA", texto["RECURSOS_IA"])
                             elif "CRONOGRAMA_IA" in cell.text:
                                 actualizar_texto_simple(cell, "CRONOGRAMA_IA", texto["CRONOGRAMA_IA"])
+                            elif "FECHA_IA" in cell.text:
+                                actualizar_texto_simple(cell, "FECHA_IA", datetime.now().strftime("%d/%m/%Y"))
     
     # Guardar la presentación con los textos actualizados
     prs.save(ruta_salida)

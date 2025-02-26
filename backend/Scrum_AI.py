@@ -152,7 +152,7 @@ def Doc(input_data: NuevosTextosInput) ->  str:
     print( nuevos_textos)
     
     nombre_doc=  "presentacion_"+chat_name+"_"+id_unico_corto+'.pptx'
-    ruta_documento=Crear_Diapositiva( nuevos_textos,  nombre_doc,usuario,chat_name)
+    ruta_documento=Crear_Diapositiva( nuevos_textos,  nombre_doc,usuario,chat_name,st.session_state.area)
     val=1
     return f"El documento se ha creado y  guardado como: {ruta_documento}"
    

@@ -2,7 +2,9 @@ from pymongo import MongoClient
 import os
 import json
 import gridfs
-
+import pandas as pd
+from datetime import datetime
+from collections import defaultdict
 
 # Conexión a MongoDB
 uri = "mongodb://dev_jhurtado:Pka12msE1b2qO1@192.168.193.5:27017/AIProjects?authSource=admin"
@@ -316,3 +318,211 @@ def obtener_archivo_excel_gridfs(filename):
     except Exception as e:
         print(f"Error al recuperar el archivo: {e}")
         return None, None
+def  insertar_matriz_producto(df,proyecto):
+
+    # Conexión a MongoDB con autenticación
+    db = client["AIProjects"]  # Base de datos
+    collection = db["matriz_Pri"]  # Colección donde se guardarán los datos
+    # Suponiendo que ya tienes un DataFrame llamado df
+    data_dict = df.to_dict(orient="records")
+    # Agregar el campo "campo": "an1" a cada elemento
+    for i, item in enumerate(data_dict):  
+        item["proyecto"] = proyecto  
+        item["epica"] = df.index[i]
+
+    # Insertar los datos en MongoDB
+    collection.insert_many(data_dict)
+    print("Datos de la matriz  guardados en MongoDB ")
+def  consultar_matriz_producto(area):
+    db = client["AIProjects"]  # Base de datos
+    collection = db["matriz_Pri"]  # Colección donde se guardarán los datos
+    resultado = collection.find({"proyecto": {"$regex": area, "$options": "i"}})
+    return resultado
+
+def actualizar_un_elemento_matriz(filtro,actualizacion):
+    db = client["AIProjects"]  # Base de datos
+    collection = db["matriz_Pri"]  # Colección donde se guardarán los datos
+    collection.update_one(filtro, actualizacion, upsert=True)
+def consultar_matriz_exis_proyecto(proyecto):
+    db = client["AIProjects"]  # Base de datos
+    collection = db["matriz_Pri"]  # Colección donde se guardarán los datos
+    resultado=None
+    # Buscar coincidencias que contengan la palabra "ant" (insensible a mayúsculas)
+    resultado = collection.find_one({"proyecto": {"$regex": proyecto, "$options": "i"}})
+    if resultado is not None:
+        return True  # Retorna True si hay coincidencias, False si no
+    else:
+        return False
+
+def agregar_info_pro(proyectos_array, epicas_agregar,nombre,nombre_proyecto ):
+    db = client["AIProjects"]  
+    collection = db["cod_proyectos"]  
+    # Crear DataFrame solo con las columnas necesarias
+    df_filtered = pd.DataFrame({'Código Proyecto': proyectos_array, 'Nombre Épica': epicas_agregar})
+
+    # Extraer Año, Número de Proyecto y Número de Épica usando regex
+    df_filtered[['Año', 'Número_Proyecto', 'Número_Épica']] = df_filtered['Código Proyecto'].str.extract(r'AN-(\d{4})-(\d+)-EP(\d+)')
+    df_filtered["Proyecto"]=nombre_proyecto
+    # Convertir a valores numéricos
+    df_filtered[['Año', 'Número_Proyecto', 'Número_Épica']] = df_filtered[['Año', 'Número_Proyecto', 'Número_Épica']].apply(pd.to_numeric)
+    df_filtered['Nombre Épica'] = epicas_agregar
+    df_filtered['Nombre_proyecto'] = nombre
+    # Convertir DataFrame a lista de diccionarios para MongoDB
+    documents = df_filtered.to_dict(orient='records')
+
+    # Insertar en MongoDB
+    collection.insert_many(documents)
+
+    print(f"Datos insertados en MongoDB correctamente. Nombre del Proyecto: {nombre_proyecto}")
+def obtener_orden_matriz(area):
+    print(area)
+    db = client["AIProjects"]
+    collection = db["cod_proyectos"]
+    # Obtener los datos de la colección
+    data = list(collection.find({"Proyecto": {"$regex": area, "$options": "i"}}))
+# Crear DataFrame
+    df = pd.DataFrame(data)
+        # Asegurarse de que las columnas Año, Número_Proyecto y Número_Épica son numéricas para hacer el ordenamiento
+    df['Año'] = pd.to_numeric(df['Año'])
+    df['Número_Proyecto'] = pd.to_numeric(df['Número_Proyecto'])
+    df['Número_Épica'] = pd.to_numeric(df['Número_Épica'])
+
+    # Ordenar los datos: Primero por Año, luego por Número de Proyecto, y luego por Número de Épica
+    df_sorted = df.sort_values(by=['Año', 'Número_Proyecto', 'Número_Épica'])
+
+    # Obtener la lista de nombres de las épicas ordenada
+    epicas_ordenadas = df_sorted['Nombre Épica'].tolist()
+    # Imprimir la lista ordenada
+    print("Epicas ordenadas:", epicas_ordenadas)
+    return epicas_ordenadas, df_sorted['Proyecto']
+def Obtener_area(NombreCompleto):
+    db = client["AIProjects"]  # Base de datos
+    collection = db["Usuario_Scrum_Area"]  # Colección donde se guardarán los datos
+    resultado=None
+    # Buscar coincidencias que contengan la palabra "ant" (insensible a mayúsculas)
+    resultado = collection.find({"NombreCompleto": {"$regex": NombreCompleto, "$options": "i"}})
+    return resultado
+def obtener_ultimo_proyecto(area):
+    print(area)
+    db = client["AIProjects"]
+    collection = db["cod_proyectos"]
+    # Obtener los datos de la colección
+    data = list(collection.find({"Proyecto": {"$regex": area, "$options": "i"}}))
+    if data:
+        año_actual = datetime.now().year
+        # Filtrar la data para obtener solo los elementos del año actual
+        data_filtrada = [item for item in data if item['Año'] == año_actual]
+
+        # Obtener el último número de proyecto
+        ultimo_numero_proyecto = max(item['Número_Proyecto'] for item in data_filtrada)
+        ultimo_numero_proyecto=ultimo_numero_proyecto+1
+        ultimo_numero_proyecto=f"{ultimo_numero_proyecto:04d}"
+        return  año_actual,ultimo_numero_proyecto
+    else:
+        return datetime.now().year,"0001"
+    
+
+def obtener_proyectos(area):
+    print(area)
+    db = client["AIProjects"]
+    collection = db["cod_proyectos"]
+    # Obtener los datos de la colección
+    data = list(collection.find({"Proyecto": {"$regex": area, "$options": "i"}}))
+    return data
+
+
+def borrar_proyecto(proyecto):
+    
+    """
+    Elimina un documento de la colección matriz_Pri basado en el proyecto y la épica.
+    
+    :param proyecto: El código del proyecto (Ej: "AN-2025-0002").
+    :param epica: El nombre de la épica a eliminar.
+    :return: Mensaje confirmando si se eliminó el documento.
+    """
+    db = client["AIProjects"]
+    collection = db["cod_proyectos"]
+    data = list(collection.find({"Proyecto": {"$regex": proyecto, "$options": "i"}}))
+    proyectos_agrupados = defaultdict(lambda: {"Nombre_proyecto": "", "Proyecto": "", "Epicas": []})
+
+    for item in data:
+        clave_proyecto = item["Proyecto"]
+        proyectos_agrupados[clave_proyecto]["Nombre_proyecto"] = item["Nombre_proyecto"]
+        proyectos_agrupados[clave_proyecto]["Proyecto"] = clave_proyecto
+        proyectos_agrupados[clave_proyecto]["Epicas"].append(item["Nombre Épica"])
+
+    # Convertir a lista
+    lista_final = list(proyectos_agrupados.values())
+    try:
+        filtro = {"Proyecto": proyecto}
+        result = collection.delete_many(filtro)
+
+        if result.deleted_count > 0:
+            print("✅ proyecto eliminado correctamente de la codificacion..")
+        else:
+            print("⚠️ No se encontró el proyecto en la codificacion.")
+    except Exception as e:
+        print("❌ Error al eliminar proyecto")
+    try:
+        for pro in lista_final:
+            borrar_epicas(pro["Epicas"])
+    except Exception as e:
+        print("❌ Error al eliminar las columnas del proyecto en la matriz")
+
+    collection = db["matriz_Pri"]
+    try:
+        filtro = {"proyecto": proyecto}
+        result = collection.delete_many(filtro)
+
+        if result.deleted_count > 0:
+            print("✅ proyecto eliminado correctamente de la matriz..")
+        else:
+            print("⚠️ No se encontró el proyecto en la matriz.")
+    except Exception as e:
+         print("❌ Error al eliminar proyecto")
+    
+
+def borrar_epicas(lista_epicas):
+    """
+    Elimina claves específicas dentro de todos los documentos de la colección.
+
+    :param lista_epicas: Lista con los nombres de las épicas a eliminar.
+    :return: Mensaje confirmando la cantidad de documentos actualizados.
+    """
+    collection = db["matriz_Pri"]
+    try:
+        count = 0  # Contador de documentos modificados
+        for epica in lista_epicas:
+            actualizacion = {"$unset": {epica: ""}}  # Eliminar la clave de la épica
+            
+            result = collection.update_many({}, actualizacion)  # Aplicar a todos los documentos
+            count += result.modified_count  # Sumar documentos modificados
+        
+        if count > 0:
+            return f"✅ {count} documento(s) actualizado(s), eliminando las claves indicadas."
+        else:
+            return f"⚠️ No se encontraron claves de épicas para eliminar."
+    except Exception as e:
+        return f"❌ Error al eliminar las claves: {e}"
+
+
+def actualizar_nombre_proyecto(proyecto,nuevo):
+    collection = db["cod_proyectos"]
+    try:
+        # Filtro: Documentos que tengan el proyecto especificado
+        filtro = {"Proyecto": proyecto}
+
+        # Operación de actualización
+        actualizacion = {
+            "$set": {
+                "Nombre_proyecto": nuevo,
+            }
+        }
+
+        # Ejecutar la actualización
+        result = collection.update_many(filtro, actualizacion)
+
+        print (f"✅ {result.modified_count} documento(s) actualizado(s)." if result.modified_count > 0 else "⚠️ No se encontraron documentos para actualizar.")
+    
+    except Exception as e:
+        print( f"❌ Error al actualizar documentos: {e}")
