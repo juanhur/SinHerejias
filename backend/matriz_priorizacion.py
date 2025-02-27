@@ -1,6 +1,6 @@
 
 import streamlit as st
-from  MongoDB  import  obtener_orden_matriz,agregar_info_pro,insertar_matriz_producto, consultar_matriz_producto, consultar_matriz_exis_proyecto,actualizar_un_elemento_matriz
+from  MongoDB  import  consultar_epicas_exis_proyecto,obtener_orden_matriz,agregar_info_pro,insertar_matriz_producto, consultar_matriz_producto, consultar_matriz_exis_proyecto,actualizar_un_elemento_matriz
 import pandas as pd
 import os
 import numpy as np
@@ -227,9 +227,13 @@ def crear_matriz(uploaded_file):
                     st.warning("No se puede agregar,la matriz ya contiene el proyecto: "+nombre_proyecto)
                     
                 else:
-                    agregar_info_pro(proyectos_array,epicas_agregar,nombre,nombre_proyecto)
-                    insertar_matriz_producto(matriz_df,nombre_proyecto)
-                    st.success("Matriz guardada exitosamente en la matriz principal de priorización.")
+                    exist_epica,epic=consultar_epicas_exis_proyecto(epicas_agregar)
+                    if exist_epica:
+                        st.warning("No se puede agregar este proyecto,  la epica: "+epic+" ya existe en otro.")
+                    else:
+                        agregar_info_pro(proyectos_array,epicas_agregar,nombre,nombre_proyecto)
+                        insertar_matriz_producto(matriz_df,nombre_proyecto)
+                        st.success("Matriz guardada exitosamente en la matriz principal de priorización.")
             else:
                 st.warning("Obligatorio insertar el nombre del proyecto"+nombre_proyecto)
         else:

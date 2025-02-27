@@ -526,3 +526,15 @@ def actualizar_nombre_proyecto(proyecto,nuevo):
     
     except Exception as e:
         print( f"❌ Error al actualizar documentos: {e}")
+
+def consultar_epicas_exis_proyecto(epicas):
+    db = client["AIProjects"]  # Base de datos
+    collection = db["cod_proyectos"]  # Colección donde se guardarán los datos
+    resultado=None
+    for epica in epicas:
+        print(epica)
+        # Buscar coincidencias que contengan la palabra "ant" (insensible a mayúsculas)
+        resultado = collection.find_one({"Nombre Épica": {"$regex": epica, "$options": "i"}})
+        if resultado is not None:
+            return True,epica  # Retorna True si hay coincidencias, False si no
+    return  False,None

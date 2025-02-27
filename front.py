@@ -497,10 +497,10 @@ def levantamiento_matriz_page(user:str,logo):
         uploaded_file= st.file_uploader("Carga el archivo de Hisotiras de Usuario,para empezar.")
         if uploaded_file is not None:
             if  uploaded_file.name.endswith('.xlsx'):
-                file_path = f"./{uploaded_file.name}"
-                with open(file_path, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                nombre_archivo = uploaded_file.name
+                #file_path = f"./{uploaded_file.name}"
+                #with open(file_path, "wb") as f:
+                    #f.write(uploaded_file.getbuffer())
+                #nombre_archivo = uploaded_file.name
                 crear_matriz( uploaded_file)
             else:
                 st.error(f"el formato del archivo no es compatible,solo se aceptan archivos Excel.")
@@ -516,15 +516,15 @@ def levantamiento_matriz_page(user:str,logo):
         🔎 **Consulta las reglas de priorización:**
             Para conocer los criterios utilizados, haz clic en **"Ver reglas"** en la parte izquierda.
 
-            🔒 **Guardar cambios**:
-            - Haz clic en **"Guardar"** una vez estés seguro de las prioridades.
+        🔒 **Guardar cambios**:
+        - Haz clic en **"Guardar"** una vez estés seguro de las prioridades.
 
-            💡 **Recuerda**: Realiza todas las ediciones en esta plataforma, ya que los cambios fuera de ella **no se reflejarán**.
+        💡 **Recuerda**: Realiza todas las ediciones en esta plataforma, ya que los cambios fuera de ella **no se reflejarán**.
 
-            📌 **Tip:** En cada columna puedes hacer clic en los **tres puntitos** para **ordenar** los datos o **fijar la columna** según tu necesidad.
+        📌 **Tip:** En cada columna puedes hacer clic en los **tres puntitos** para **ordenar** los datos o **fijar la columna** según tu necesidad.
 
-            🚀 ¡Optimiza tu proceso de priorización y mantén todo organizado!
-            """
+        🚀 ¡Optimiza tu proceso de priorización y mantén todo organizado!
+        """
         st.write(texto_explicativo)
         crear_matriz_global()
 def mostrar_chats_y_codificaciones(user, AI):
