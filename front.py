@@ -330,7 +330,7 @@ Durante el proceso, podrás interactuar con la IA para **ajustar detalles**, rec
 """
     st.write(mensajeinicial)
     st.sidebar.image(logo, caption="PENTALAB",use_container_width=True)
-    area=st.sidebar.selectbox('Area', options= st.session_state.areas_existentes.keys(), index=0 )
+    area=st.sidebar.selectbox('Area', options= st.session_state.areas_existentes.keys(), index=0 ) 
     if st.session_state.areas_existentes[area]!=st.session_state.area :
         print("el area es:"+area)
         print("el area global es:"+st.session_state.area)
@@ -732,16 +732,18 @@ def  sub_main(cookie_controller):
         st.query_params["last_AI"]  = False
     if "nuevo_HU" not in st.session_state:
         st.session_state.nuevo_HU = False
-
+    if not list( st.session_state.areas_existentes.keys()) :
+        st.error("**🔔 Alerta: Solicite la asignación de áreas para poder tener acceso a esta herramienta.**")
     # Mostrar el contenido de la página activa
-    if st.query_params["page"]  == "User_history":
-        user_history_page(st.session_state["name"],logo)
-    elif st.query_params["page"]  == "L_Proyectos":
-        levantamiento_proyectos_page(st.session_state["name"],logo)
-    elif st.query_params["page"]  == "M_Priorizacion":
-        levantamiento_matriz_page(st.session_state["name"],logo)
-    elif  st.query_params["page"]  == "Proyectos_Codificaciones":
-        mostrar_chats_y_codificaciones( logo)
+    else:
+        if st.query_params["page"]  == "User_history":
+            user_history_page(st.session_state["name"],logo)
+        elif st.query_params["page"]  == "L_Proyectos":
+            levantamiento_proyectos_page(st.session_state["name"],logo)
+        elif st.query_params["page"]  == "M_Priorizacion":
+            levantamiento_matriz_page(st.session_state["name"],logo)
+        elif  st.query_params["page"]  == "Proyectos_Codificaciones":
+            mostrar_chats_y_codificaciones( logo)
     # Navegación entre ventanas
     with st.sidebar:
         # Usar Markdown y CSS para darle forma circular a la imagen en el sidebar
