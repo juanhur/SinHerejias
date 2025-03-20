@@ -1,12 +1,14 @@
 
 import streamlit as st
-from  MongoDB  import  consultar_epicas_exis_proyecto,obtener_orden_matriz,agregar_info_pro,insertar_matriz_producto, consultar_matriz_producto, consultar_matriz_exis_proyecto,actualizar_un_elemento_matriz
+from  MongoDB  import  insertar_matriz_producto_multi,obtener_proyectos_puntuacion_codigo, extraer_codigo_epicas_por_codigo_proyecto,consultar_matriz_producto_global,extraer_epicas_por_codigo_proyecto,consultar_matriz_exis_proyecto_nombre,actualizar_un_elemento_matriz_n,borrar_proyecto_matriz,obtener_proyectos,consultar_nombres_proyectos,obtener_proyectos_puntuacion, consultar_epicas_por_codigo_proyecto, consultar_epicas_exis_proyecto,obtener_orden_matriz,agregar_info_pro,insertar_matriz_producto, consultar_matriz_producto, consultar_matriz_exis_proyecto,actualizar_un_elemento_matriz
 import pandas as pd
 import os
 import numpy as np
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
+from streamlit_sortables import sort_items
+from collections import defaultdict
 
 def obtener_valores_posiciones(hoja, fila_fija=True):
     valores_posiciones = {}
@@ -33,19 +35,23 @@ def combinar_celdas(hoja, valores_posiciones):
             celda_inicio.fill = relleno
             celda_inicio.font = Font(bold=True)
 
-def Generar_doc_matriz(usuario,df):
+def Generar_doc_matriz(usuario,df,columnas_orden=None):
     lista_orden,proyectos_ord=obtener_orden_matriz(st.session_state.area)
     # Ordenar el DataFrame por proyecto
+    print(columnas_orden)
+    if columnas_orden is not None:
+        df.columns = columnas_orden
     df_filtrado = df.sort_values(by=["proyecto"])
     # Ordenar las columnas según el índice de las filas (asumiendo que las columnas coinciden con el índice)
-    df_filtrado = df_filtrado.reindex(columns=lista_orden)
+    #df_filtrado = df_filtrado.reindex(columns=lista_orden)
+    #df_filtrado = df_filtrado.reindex(index=lista_orden)
+
     proyectos_count = proyectos_ord.value_counts()
     proyectos_count_ordenado = proyectos_count.reindex(proyectos_ord.unique(), fill_value=0)
     proyectos_count=proyectos_count_ordenado
     # Elimina la columna 'proyecto'
     df.drop(columns=['proyecto'], inplace=True)
-    df=df_filtrado
-
+    df=df_filtrado.drop(columns=['proyecto'])#, inplace=True)
 
     salida = "./archivos/matriz_priorizacion_"+usuario+".xlsx"
     with pd.ExcelWriter(salida, engine='openpyxl') as writer:
@@ -82,7 +88,8 @@ def Generar_doc_matriz(usuario,df):
         celda.font = fuente_blanca
         if i == 1:
             celda.value = "PROYECTO"
-
+        if i == 2:
+            celda.value = "EPICAS"
     borde_fino = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
     for fila in sheet.iter_rows(min_row=1, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column):
         for celda in fila:
@@ -126,6 +133,7 @@ def Generar_doc_matriz(usuario,df):
     wb.close()
     return salida
 
+
 def encontrar_prefijo_comun(lista):
     """Devuelve el mayor prefijo común de todos los strings en la lista."""
     if not lista:
@@ -165,59 +173,20 @@ def crear_matriz(uploaded_file):
     df["Prioridad_x_Esfuerzo"] = df["Estimación de Esfuerzo"] * df["Prioridad(Valor)"]
     df= df.iloc[:, [1,3,6,(int(df.shape[1])-2),(int(df.shape[1])-1)]]
     # Aplicar la función a la columna 5 y crear una nueva columna 'Valor Asignado'
-    # impacto/esfuerzo  impacto(prioridad + esfuerzo)/ numero de horas+personas
+    # impacto/esfuerzo  impacto(pr2)/ numero de horas+personas
 # Agrupar por 'Épica' y sumar las columnas numéricas
     df_agrupado = df.groupby("Épica").sum(numeric_only=True)
     st.write("📊 *Impacto de cada Épica*")
     st.write("📌 **Tip:** En cada columna puedes hacer clic en los **tres puntitos** para **ordenar** los datos o **fijar la columna** según tu necesidad.")
     st.dataframe(df_agrupado)
-        # Agregar proyectos y épicas a la primera columna (índice)
-    matriz_df = pd.DataFrame().astype(object)
-
-    # 2️⃣ Obtener el índice actual del DataFrame
-    indice_existente = matriz_df.index.tolist()
-    print("estos son los indices actuales de la matriz "+ str(indice_existente))
-    lista_columnas = matriz_df.columns.tolist()
-    print("estos son las columnas  actuales de la matriz "+ str(lista_columnas ))
-    for columna in epicas_agregar:
-        if columna not in lista_columnas:
-            matriz_df[columna] = None  # Añadir nueva columna con valores nulos
-    # 3️⃣ Filtrar elementos que aún no están en el índice
-    nuevas_filas = []
-    for item in  epicas_agregar:
-        if item not in indice_existente:
-            nuevas_filas.append(item)
-    
-
-    # ✅ Ahora `nuevas_filas` contiene solo los elementos que faltan en el DataFrame
-    print(nuevas_filas)
-    if nuevas_filas:
-        nuevas_filas_df = pd.DataFrame(index=nuevas_filas, columns=matriz_df.columns)
-        print("esta es la matriz a concatenar")
-        print(nuevas_filas_df)
-        matriz_df = pd.concat([matriz_df, nuevas_filas_df])
-        # Convertir en matriz identidad en las coincidencias fila-columna
-    n = len(matriz_df)  # Obtener el tamaño de la matriz cuadrada
-    matriz_df[:] = np.eye(n)  # Asignar matriz identidad
-
-    # Asegurar que los nombres de las filas y columnas coincidan
-    matriz_df.index = matriz_df.columns
+    matriz_df,total_prioridad,df_Prioridad=Estimar_priorizacion_proyecto_relativa_peso(df_agrupado)
+    #matriz_df=Estimar_priorizacion_proyecto(df_agrupado) matriz sin considerar la proporcion dle proyecto,solo relativa
     # Mostrar la matriz actualizada
     st.write("📊 Matriz de Priorización del Proyecto:"+" **"+ nombre_proyecto+"**")
-
+    
     nombre = st.text_input("**Ingresa el nombre del proyecto:**")
-    st.write(
-        """📌 **Tip:** 1) para editar una celda solo es necesario hacer doble click en ella."""
-        )
-    edited_df = st.data_editor(
-        matriz_df,
-        num_rows="dynamic",
-        use_container_width=True
-    )
-
-            # Crear un checkbox para la confirmación
     confirmar_guardado = st.checkbox("Estoy seguro de que deseo guardar esta matriz. Se almacenará en la matriz principal de priorización con todos los proyectos actuales.")
-
+    #st.dataframe(matriz_df)
     # Crear el botón de guardado
     if st.button("Guardar Matriz de Priorización del Proyecto"):
         if confirmar_guardado:
@@ -228,10 +197,13 @@ def crear_matriz(uploaded_file):
                     
                 else:
                     exist_epica,epic=consultar_epicas_exis_proyecto(epicas_agregar)
-                    if exist_epica:
-                        st.warning("No se puede agregar este proyecto,  la epica: "+epic+" ya existe en otro.")
+                    #if exist_epica:
+                        #st.warning("No se puede agregar este proyecto,  la epica: "+epic+" ya existe en otro.")
+                    #else:
+                    if consultar_matriz_exis_proyecto_nombre(nombre):
+                            st.warning("No se puede agregar este proyecto,  el nombre del  ya existe")
                     else:
-                        agregar_info_pro(proyectos_array,epicas_agregar,nombre,nombre_proyecto)
+                        agregar_info_pro(proyectos_array,epicas_agregar,nombre,nombre_proyecto,total_prioridad,df_Prioridad)
                         insertar_matriz_producto(matriz_df,nombre_proyecto)
                         st.success("Matriz guardada exitosamente en la matriz principal de priorización.")
             else:
@@ -239,51 +211,93 @@ def crear_matriz(uploaded_file):
         else:
             st.warning("Por favor, confirma que deseas guardar la matriz marcando la casilla de verificación.")
 
-
-
-
 def crear_matriz_global( ):
     result = consultar_matriz_producto(st.session_state.area)
     try:
-        df = pd.DataFrame(result).drop(columns=['_id']).set_index('epica')
+        df = pd.DataFrame(result)
+        if not df.empty:
+            print("El DataFrame tiene datos.")
+        else:
+            df=None
     except:
         df=None
     if df is not None:
         proyectos_unicos = df["proyecto"].unique()
         proyectos_seleccionados = st.multiselect("Selecciona proyectos:", proyectos_unicos)
+        epicas_proyecto_codigo=extraer_codigo_epicas_por_codigo_proyecto(proyectos_unicos)
+        epicas_proyecto=extraer_epicas_por_codigo_proyecto(proyectos_unicos)
         # Aplicar filtro
         if proyectos_seleccionados:
             lista_orden,proyectos_ord=obtener_orden_matriz(st.session_state.area)
-            df_filtrado = df[df["proyecto"].isin(proyectos_seleccionados)]
-            df_filtrado = df_filtrado.sort_values(by=["proyecto"])
+            df =consultar_matriz_producto_global(st.session_state.area,epicas_proyecto,proyectos_unicos,epicas_proyecto_codigo,proyectos_ord)
+            df.set_index("id_epica", inplace=True)
+            df_Proyectos_T,df_Proyecto=obtener_proyectos_puntuacion_codigo(st.session_state.area,epicas_proyecto_codigo,proyectos_ord)
+            matriz_suma = df_Proyectos_T + df_Proyecto
+            matriz_suma=calcular_Matriz_rango_valores(matriz_suma)
+            #st.dataframe(df)
+            for index, row in df.iterrows():
+                index_name= epicas_proyecto_codigo[row[0]][index]
+                #print(index_name)
+                if index_name in matriz_suma.index:  # Verificar si el índice existe en matriz_suma
+                    for col_name, valor in row.items():
+                        if valor == 0:
+                            df.at[index, col_name] = matriz_suma.loc[index_name, col_name]
 
-            # Ordenar las columnas según el índice de las filas (asumiendo que las columnas coinciden con el índice)
-            df_filtrado = df_filtrado.reindex(columns=lista_orden)
+            df_filtrado=df[df['proyecto'].isin(proyectos_seleccionados)]
+            matrices_proyectos,mapeo_proyectos=separar_matriz_global_por_proyectos (df_filtrado)
+            # Diccionario para almacenar las ediciones
+            matrices_editadas = {}
+            # Mostrar cada matriz y permitir la edición
+            for nombre, df in matrices_proyectos.items():
+                st.write(f"### Matriz para el proyecto: {nombre}")
+                renombrar={v: k for k, v in epicas_proyecto_codigo[mapeo_proyectos[nombre]].items()}
+                renombrar['proyecto'] = None
+                # Editor de datos sin la columna "proyecto"
+                edited_df = st.data_editor(
+                    df,
+                    column_config=renombrar,
+                    num_rows="dynamic",
+                    use_container_width=True
+                )
+                # Guardar en el diccionario con el nombre del proyecto
+                matrices_editadas[nombre] = edited_df
 
-            # Mostrar el DataFrame sin la columna "proyecto"
-            edited_df = st.data_editor(
-                df_filtrado.loc[:, ~df_filtrado.columns.isin(["proyecto"])],
-                num_rows="dynamic",
-                use_container_width=True
-            )
-                # Botón para guardar cambios en MongoDB
+            # Botón para guardar todas las matrices en MongoDB
             if st.button("Guardar cambios en la matriz global"):
-                for index, row in edited_df.iterrows():
-                    # Buscar si la épica (índice) existe en la colección
-                    filtro = {"epica": index}
-                    actualizacion = {"$set": row.to_dict()}  # Convierte la fila editada a diccionario
-                    # Actualizar en MongoDB
-                    actualizar_un_elemento_matriz(filtro,actualizacion)
+                keys = list(matrices_editadas.keys())
 
-                st.success("✅ Datos actualizados correctamente en MongoDB.")
-        
+                # Eliminar 'proyecto' de todos excepto el último
+                for i, name in enumerate(keys):
+                    if 'proyecto' in matrices_editadas[name].columns and i != len(keys) - 1:
+                        matrices_editadas[name] = matrices_editadas[name].drop(columns=['proyecto'])
+
+                # Concatenar los DataFrames
+                edited_df = pd.concat(matrices_editadas.values(), axis=1)
+                #st.dataframe(edited_df)
+                #st.write(edited_df['proyecto'].unique())
+                insertar_matriz_producto_multi(edited_df,edited_df['proyecto'].unique())
+                st.success("Todas las matrices han sido guardadas correctamente.")
+                #st.rerun()
         else:
             st.warning("Selecciona al menos un proyecto para ver la matriz")
         
 
-        if st.button("Exportar a Excel"):
+        if st.button("Exportar a un Excel"):
                 ruta=None
-                ruta=Generar_doc_matriz(st.session_state["name"],df)
+                lista_orden,proyectos_ord=obtener_orden_matriz(st.session_state.area)
+                result = consultar_matriz_producto_global(st.session_state.area,epicas_proyecto,proyectos_unicos,epicas_proyecto_codigo,proyectos_ord)
+                orden_columnas=[valor for proyecto in proyectos_ord.unique() for valor in epicas_proyecto_codigo.get(proyecto, {}).values()]
+                orden_columnas.append('proyecto')
+                print(epicas_proyecto_codigo)
+                print(orden_columnas)
+                df1 = pd.DataFrame(result).set_index('id_epica')
+                df1 = df1.reindex(columns=orden_columnas)
+                #convertir  el nombre dela columan a nombre epicas en lsita
+                dic_inverso = {v: k for sub_dic in epicas_proyecto_codigo.values() for k, v in sub_dic.items()}
+                orden_columnas = [dic_inverso.get(item, item) for item in df1.columns]
+                #st.dataframe(df1)
+                ruta=Generar_doc_matriz(st.session_state["name"], df1,orden_columnas)
+                #st.dataframe(df1)
                 if ruta:
                     # Leer el archivo en modo binario
                     with open(ruta, "rb") as archivo:
@@ -306,3 +320,267 @@ def crear_matriz_global( ):
         st.warning("No tiene actualmenten proyectos.")
 
 
+def crear_matriz_global_su_orden( ):
+    result = consultar_matriz_producto(st.session_state.area)
+    try:
+        df = pd.DataFrame(result)
+        if not df.empty:
+            print("El DataFrame tiene datos.")
+        else:
+            df=None
+    except:
+        df=None
+    if df is not None:
+        lista_orden,proyectos_ord=obtener_orden_matriz(st.session_state.area)
+        proyectos_unicos = df["proyecto"].unique()
+        epicas_proyecto_codigo=extraer_codigo_epicas_por_codigo_proyecto(proyectos_unicos)
+        df_Proyectos_T,df_Proyecto=obtener_proyectos_puntuacion_codigo(st.session_state.area,epicas_proyecto_codigo,proyectos_ord)
+        ######################cambio para manejar proyectos ocn misma epica
+        # df_Proyectos_T,df_Proyecto=obtener_proyectos_puntuacion(st.session_state.area,lista_orden)
+        matriz_suma = df_Proyectos_T + df_Proyecto
+        proyectos_seleccionados=consultar_nombres_proyectos(list(proyectos_ord))
+        Proyectocod_nom = [f"{k}/{v}" for k, v in proyectos_seleccionados.items()]
+        #df["proyecto"]=proyectos_ord.values
+        sorted_items = sort_items(Proyectocod_nom)
+        ponderaciones = np.linspace(5, 0.5, len(sorted_items))
+        # Número total de elementos en la lista
+        imp_proyectos = {item.split('/')[0]: valor for item, valor in zip(sorted_items , ponderaciones)}
+        print (imp_proyectos)
+        matriz_suma["proyecto"]=proyectos_ord.values
+        #st.dataframe(matriz_suma)
+        columnas_numericas = matriz_suma.select_dtypes(include=['float64', 'int']).columns
+        print(columnas_numericas)
+        # Multiplicar las columnas numéricas por el valor correspondiente en el diccionario
+        matriz_suma[columnas_numericas] =  matriz_suma.apply(lambda row: row[columnas_numericas] * imp_proyectos[row["proyecto"]], axis=1)
+        matriz_suma.drop(columns=['proyecto'], inplace=True)
+        df=calcular_Matriz_rango_valores(matriz_suma)
+        for i in range(len(df)):
+            df.iloc[i, i] = 1  # Asignamos 1 a cada elemento en la diagonal
+        df["proyecto"]=proyectos_ord.values
+        #st.dataframe(df)
+        #convertir  el nombre dela columan a nombre epicas en lsita
+        dic_inverso = {v: k for sub_dic in epicas_proyecto_codigo.values() for k, v in sub_dic.items()}
+        orden_columnas = [dic_inverso.get(item, item) for item in df.columns]
+        
+        #ruta=Generar_doc_matriz(st.session_state["name"], df,orden_columnas)
+        return df,orden_columnas
+    else:
+        st.warning("No tiene actualmente proyectos.")
+    
+    
+def crear_matriz_globa_sug():
+    result = consultar_matriz_producto(st.session_state.area)
+    #st.dataframe(result)
+    try:
+        df = pd.DataFrame(result)
+        if not df.empty:
+            print("El DataFrame tiene datos.")
+        else:
+            df=None
+    except:
+        df=None
+    if df is not None:
+        lista_orden,proyectos_ord=obtener_orden_matriz(st.session_state.area)
+        df_Proyectos_T,df_Proyecto=obtener_proyectos_puntuacion(st.session_state.area,lista_orden)
+        matriz_suma = df_Proyectos_T + df_Proyecto
+        df=calcular_Matriz_rango_valores(matriz_suma)
+        df["proyecto"]=proyectos_ord.values
+        return df
+    else:
+        st.warning("No tiene actualmente proyectos.")
+        return None
+
+
+def Estimar_priorizacion_proyecto(df):
+    # Crear la matriz de priorización relativa en función de la última columna (Valor3)
+    df['Ultima_Columna'] = df['Prioridad_x_Esfuerzo']
+    # Asegurarse de que 'Epica' es el índice del DataFrame
+    # Ordenamos las épicas de acuerdo a la última columna (de mayor a menor)
+    df_sorted = df.sort_values('Ultima_Columna', ascending=False)
+
+    # Inicializar la matriz de priorización
+    n = len(df_sorted)
+    priorization_matrix = np.ones((n, n))
+
+    # Llenar la matriz con las relaciones de importancia
+    for i in range(n):
+        for j in range(n):
+            if i != j:
+                A = df_sorted.iloc[i]['Ultima_Columna']
+                B = df_sorted.iloc[j]['Ultima_Columna']
+                ratio = A / B
+                
+                if ratio >= 4:
+                    priorization_matrix[i, j] = 4
+                elif ratio >= 2:
+                    priorization_matrix[i, j] = 2
+                elif ratio >= 1:
+                    priorization_matrix[i, j] = 1
+                elif ratio >= 0.5:
+                    priorization_matrix[i, j] = 1/2
+                else:
+                    priorization_matrix[i, j] = 1/4
+    # Crear un DataFrame para la matriz de priorización
+    priorization_df = pd.DataFrame(priorization_matrix, 
+                                index=df_sorted.index, 
+                                columns=df_sorted.index)
+
+    return priorization_df
+def Estimar_priorizacion_proyecto_relativa_peso(df):
+    # Calcular el total de Prioridad_x_Esfuerzo
+    total_prioridad = df['Prioridad_x_Esfuerzo'].sum()
+
+    # Calcular el peso de cada épica en relación al total
+    df['Peso_Proyecto'] = df['Prioridad_x_Esfuerzo'] / total_prioridad
+
+    # Ordenar las épicas según la última columna (de mayor a menor)
+    df_sorted = df.sort_values('Prioridad_x_Esfuerzo', ascending=False)
+
+    # Inicializar la matriz de priorización
+    n = len(df_sorted)
+    priorization_matrix = np.ones((n, n))
+
+    # Llenar la matriz con las relaciones de importancia considerando el peso del proyecto
+    for i in range(n):
+        for j in range(n):
+            if i != j:
+                priorization_matrix[i, j] = 0
+    # Crear un DataFrame para la matriz de priorización
+    priorization_df = pd.DataFrame(priorization_matrix, 
+                                index=df_sorted.index, 
+                                columns=df_sorted.index)
+
+    # Mostrar la matriz de priorización
+    print("Matriz de priorización:")
+    print( df_sorted )
+    return priorization_df,total_prioridad, df_sorted
+def calcular_Matriz_rango_valores(matriz_suma):
+
+    # Obtener todos los valores excepto la diagonal
+    valores = matriz_suma.values.flatten()
+    valores = valores[valores != 1]  # Excluir la diagonal porque será 1
+
+    # Calcular los quintiles (percentiles 20, 40, 60, 80, 100)
+    quintiles = np.percentile(valores, [20, 40, 60, 80, 100])
+
+    # Definir los valores a asignar en cada rango
+    valores_asignados = [0.25, 0.5, 1, 2, 4]
+
+    # Función para mapear valores según los quintiles
+    def mapear_valor(x):
+        for i in range(5):
+            if x <= quintiles[i]:
+                return valores_asignados[i]
+        return 4  # Si el valor es el máximo, asignar 4
+
+    # Aplicar la transformación a toda la matriz
+    matriz_rangos = matriz_suma.map(mapear_valor)
+
+    # Mantener la diagonal en 1
+    np.fill_diagonal(matriz_rangos.values, 1)
+
+    return matriz_rangos
+
+# Función para actualizar df con los valores editados
+def actualizar_df(df, edited_df):
+    try:
+        # Asegurarse de que ambos DataFrames tengan los mismos índices (filas)
+        # Filtramos df para que tenga solo las filas de edited_df
+        df_filtrado = df[df.index.isin(edited_df.index)]
+
+        # Actualizar solo las filas filtradas
+        for idx in edited_df.index:
+            # Compara y actualiza solo las filas con el mismo índice
+            for col in edited_df.columns:
+                if df.at[idx, col] != edited_df.at[idx, col]:  # Si el valor es diferente, actualizamos
+                    df.at[idx, col] = edited_df.at[idx, col]
+
+    except Exception as e:
+        st.error(e)
+
+    return df
+
+def cargar_matriz_global(uploaded_file ):
+    df = pd.read_excel(uploaded_file)
+    df = df.iloc[:-1]
+    df = df.iloc[:, :-2]
+        # Establecer la primera fila como los nombres de las columnas
+    df.iloc[0, 0] = 'proyecto'
+    #df.columns = df.iloc[0]
+    #df.columns = df.iloc[0]
+    #df = df.drop(0).reset_index(drop=True)
+    lista_columnas_proyectos =list(df.columns)
+    proyectos_existentes_excel=list(set(lista_columnas_proyectos))
+    while "PROYECTO" in proyectos_existentes_excel:
+        proyectos_existentes_excel.remove("PROYECTO")
+    epicas_proyecto_codigo=extraer_codigo_epicas_por_codigo_proyecto(proyectos_existentes_excel)
+    for i in range(1, len(lista_columnas_proyectos)):
+        if "Unnamed" in lista_columnas_proyectos[i]:
+            lista_columnas_proyectos[i] = lista_columnas_proyectos[i-1]
+    for i in range(len(df.columns)):
+        # Cambiar el valor de la primera fila según una condición o lo que necesites
+        if lista_columnas_proyectos[i]!="PROYECTO":
+            df.iloc[0, i] = epicas_proyecto_codigo[lista_columnas_proyectos[i]][df.iloc[0, i]]
+
+    df.columns = df.iloc[0]
+    df = df.rename(columns={'EPICAS': 'epica'})
+    # Eliminar la primera fila, ya que ahora es redundante
+    df = df.drop(0).reset_index(drop=True)
+    for index, row in df.iterrows():
+        if isinstance(row['proyecto'], str):  # Cuando encuentres un nuevo valor (AN-xxxx-xxxx)
+            current_value = row['proyecto']
+        elif current_value is not None:  # Si ya hay un valor de proyecto actual
+            df.at[index, 'proyecto'] = current_value  # Actualiza el valor en la columna
+        # Agrupar por la columna 'proyecto'
+    grouped = df.groupby('proyecto')
+
+    # Crear un diccionario con DataFrames para cada proyecto
+    project_dfs = {project: grouped.get_group(project) for project in grouped.groups}
+    Proyectos_registrados=obtener_proyectos(st.session_state.area)
+    Proyectos_registrados = list({item['Proyecto'] for item in Proyectos_registrados})
+    proyectos_no_registrados = [project for project in project_dfs.keys() if project not in Proyectos_registrados]
+    if proyectos_no_registrados :
+        proyectos_no_registrados= ", ".join(proyectos_no_registrados)
+        st.error("No se puede cargar el archivo ,actualmente no se existen los siguientes proyectos: "+"*"+proyectos_no_registrados+"*")
+    else:
+        for project, project_df in project_dfs.items():
+            project_df= project_df.set_index('epica')
+            #st.dataframe(project_df)
+            #st.write( project)
+            borrar_proyecto_matriz(project)
+            project=[project]
+            insertar_matriz_producto_multi(project_df,project)
+            #insertar_matriz_producto(project_df,project)
+        st.success("Matriz Actualizada ")
+def separar_matriz_global_por_proyectos (df):
+    proyectos = obtener_proyectos(st.session_state.area)  # Suponiendo que esta función obtiene los proyectos
+    # Diccionario para agrupar por proyecto
+    proyectos_agrupados = defaultdict(lambda: {"Nombre_proyecto": "", "Proyecto": "", "Epicas": []})
+    # Agrupamos los proyectos según la nueva estructura
+    for item in proyectos:
+        clave_proyecto = item["Proyecto"]  # Ahora buscamos por "proyecto"
+        proyectos_agrupados[clave_proyecto]["Nombre_proyecto"] = item["Nombre_proyecto"]
+        proyectos_agrupados[clave_proyecto]["Proyecto"] = clave_proyecto
+        proyectos_agrupados[clave_proyecto]["Epicas"].append(item["Código Proyecto"])
+
+    # Convertir a lista
+    proyectos = list(proyectos_agrupados.values())
+    matrices_proyectos = {}
+    mapeo_proyectos = {}
+    
+    for proyecto in proyectos:
+        nombre_proyecto = proyecto["Nombre_proyecto"]
+        epicas_proyecto = proyecto["Epicas"]
+        mapeo_proyectos[nombre_proyecto] = proyecto["Proyecto"]
+
+        # Filtrar columnas que corresponden al proyecto
+        columnas_presentes = [str(epica) for epica in epicas_proyecto if str(epica) in df.columns]  # Cambiado a string
+        columnas_presentes.append("proyecto")
+        if columnas_presentes:
+            # Filtramos y nos aseguramos de mantener el mismo índice
+            df_proyecto = df[columnas_presentes].copy()
+            df_proyecto = df_proyecto.reindex(df.index)  # Mantener el orden original de filas
+            
+            matrices_proyectos[nombre_proyecto] = df_proyecto
+
+    return matrices_proyectos, mapeo_proyectos

@@ -1,6 +1,5 @@
 import streamlit as st
 import re
-import os 
 import requests
 from authenticator.controller.authentication_controller import AuthenticationController
 from authenticator.controller.cookie_controller import CookieController
@@ -8,7 +7,7 @@ import  authenticator.params as params
 from typing import Generator
 from backend.Scrum_AI import Agente_AI
 from backend.UserHist_AI import Agente_UH_AI
-from backend.matriz_priorizacion import cargar_matriz_global,Generar_doc_matriz,crear_matriz,crear_matriz_global, crear_matriz_globa_sug,crear_matriz_global_su_orden
+from backend.matriz_priorizacion import crear_matriz,crear_matriz_global
 from PIL import Image
 from docx import Document
 from PyPDF2 import PdfReader
@@ -78,21 +77,15 @@ El chat te guiará a través de los siguientes pasos para estructurar las histor
     """
     st.write(mensajeinicial)
     st.sidebar.image(logo, caption="PENTALAB",use_container_width=True)
-
-    area=st.sidebar.selectbox('Area', options= st.session_state.areas_existentes.keys(), index=0)
-    if st.session_state.areas_existentes[area]!=st.session_state.area :
-        st.session_state.area=st.session_state.areas_existentes[area]
-        st.session_state.messages = []
-        st.session_state.nuevo_HU=False
-        st.session_state.nuevo_p=False
-
     if "messages" not in st.session_state:
         st.session_state.messages = []
     #chats= Obtener_Chat(ruta)
     print("el usuario es"+user)  
-    print( st.session_state.area)
-    chats=Obtener_Nombres_ChatDB(user,AI,st.session_state.area)
+    chats=Obtener_Nombres_ChatDB(user,AI)
+    print(chats)
 
+    if "nuevo_HU" not in st.session_state:
+            st.session_state.nuevo_HU = False
     if not chats :
         print("entro2")
         st.session_state.nuevo_HU=True
@@ -129,21 +122,17 @@ El chat te guiará a través de los siguientes pasos para estructurar las histor
         st.query_params.last_AI=False
 
     if  st.session_state.nuevo_HU==False:
-        col1, col2 = st.sidebar.columns(2)  # Divide la pantalla en dos columnas
+        if st.sidebar.button("🗑️Borrar chat"):
+            #borrar_chat(parModelo, ruta)  # Borrar el archivo correspondiente      # Muestra mensajes de chat desde la historia en la aplicación
+            borrar_chatDB(user, parModelo,AI)
+            st.rerun() 
+        
+        if st.sidebar.button("💾Nuevo_Proyecto"):
+            #borrar_chat(parModelo, ruta)  # Borrar el archivo correspondiente      # Muestra mensajes de chat desde la historia en la aplicación
+            st.session_state.nuevo_HU = True
+            st.session_state.messages = []
 
-        with col1:
-            if st.button("🗑️Borrar chat"):
-                #borrar_chat(parModelo, ruta)  # Borrar el archivo correspondiente      # Muestra mensajes de chat desde la historia en la aplicación
-                borrar_chatDB(user, parModelo,AI,st.session_state.area)
-                st.rerun() 
-
-        with col2:
-            if st.button("💾Nuevo chat"):
-                ##borrar_chat(parModelo, ruta)  # Borrar el archivo correspondiente      # Muestra mensajes de chat desde la historia en la aplicación
-                st.session_state.nuevo_HU = True
-                st.session_state.messages = []
-                st.session_state.nuevo_p=True
-                st.rerun() 
+            st.rerun() 
     if  st.session_state.nuevo_HU==True:
         print("entro ")
         nombre_archivo=st.sidebar.text_input(" Para guardar este  chat,ingresa un nombre:",key=1)
@@ -154,7 +143,7 @@ El chat te guiará a través de los siguientes pasos para estructurar las histor
                     st.sidebar.error("El nombre no puede contener espacios")
                 else:
                     # Guardar el chat con el nombre proporcionado
-                    respuesta=guardar_nuevo_chatDB(user, nombre_archivo, st.session_state.messages,AI,st.session_state.area)
+                    respuesta=guardar_nuevo_chatDB(user, nombre_archivo, st.session_state.messages,AI)
                     st.session_state.last_model = nombre_archivo
                     st.session_state.nuevo_HU=False
                     st.sidebar.success(respuesta)  
@@ -330,26 +319,16 @@ Durante el proceso, podrás interactuar con la IA para **ajustar detalles**, rec
 """
     st.write(mensajeinicial)
     st.sidebar.image(logo, caption="PENTALAB",use_container_width=True)
-    area=st.sidebar.selectbox('Area', options= st.session_state.areas_existentes.keys(), index=0 )
-    if st.session_state.areas_existentes[area]!=st.session_state.area :
-        print("el area es:"+area)
-        print("el area global es:"+st.session_state.area)
-        st.session_state.area=st.session_state.areas_existentes[area]
-        st.session_state.messages = []
-        st.session_state.nuevo_HU=False
-        st.session_state.nuevo_p=False
-        #st.rerun()
     if "messages" not in st.session_state:
         st.session_state.messages = []
     if "nuevo_p"not in st.session_state:
         st.session_state.nuevo_p = False
     AI="L_Proyectos"
-    chats=Obtener_Nombres_ChatDB(user,AI,st.session_state.area)
-    print("los chat son"+str(chats))
+    chats=Obtener_Nombres_ChatDB(user,AI)
     if not chats :
         st.session_state.nuevo_p=True
     if st.session_state.nuevo_p==False:
-        parModelo = st.sidebar.selectbox('Chats', options=chats, index=0 )
+        parModelo = st.sidebar.selectbox('Chats', options=chats, index=0,disabled= st.session_state.nuevo_p )
     else:
         parModelo="nuevo_chat"
     if "last_model" not in st.session_state:
@@ -377,22 +356,16 @@ Durante el proceso, podrás interactuar con la IA para **ajustar detalles**, rec
         st.query_params.last_AI=False
    
     if  st.session_state.nuevo_p==False:
-        col1, col2 = st.sidebar.columns(2)  # Divide la pantalla en dos columnas
-
-        with col1:
-            if st.button("🗑️Borrar chat"):
-                #borrar_chat(parModelo, ruta)  # Borrar el archivo correspondiente      # Muestra mensajes de chat desde la historia en la aplicación
-                borrar_chatDB(user, parModelo,AI,st.session_state.area)
-                st.rerun() 
-
-        with col2:
-            if st.button("💾Nuevo chat"):
-                ##borrar_chat(parModelo, ruta)  # Borrar el archivo correspondiente      # Muestra mensajes de chat desde la historia en la aplicación
-                st.session_state.nuevo_HU = True
-                st.session_state.messages = []
-                st.session_state.nuevo_p=True
-                st.rerun() 
-         
+        if st.sidebar.button("🗑️Borrar chat"):
+            #borrar_chat(parModelo, ruta)  # Borrar el archivo correspondiente      # Muestra mensajes de chat desde la historia en la aplicación
+            borrar_chatDB(user, parModelo,AI)
+            st.rerun() 
+        
+        if st.sidebar.button("💾Nuevo_Proyecto"):
+            #borrar_chat(parModelo, ruta)  # Borrar el archivo correspondiente      # Muestra mensajes de chat desde la historia en la aplicación
+            st.session_state.nuevo_p = True
+            st.session_state.messages = []
+            st.rerun() 
     print(st.session_state.nuevo_p) 
     if  st.session_state.nuevo_p==True:
         nombre_archivo=st.sidebar.text_input(" Para guardar este  chat,ingresa un nombre:")
@@ -403,7 +376,7 @@ Durante el proceso, podrás interactuar con la IA para **ajustar detalles**, rec
                     st.sidebar.error("El nombre no puede contener espacios")
                 else:
                     # Guardar el chat con el nombre proporcionado
-                    respuesta=guardar_nuevo_chatDB(user, nombre_archivo, st.session_state.messages,AI,st.session_state.area)
+                    respuesta=guardar_nuevo_chatDB(user, nombre_archivo, st.session_state.messages,AI)
                     st.session_state.last_model = nombre_archivo
                     st.session_state.nuevo_p=False
                     st.sidebar.success(respuesta)  
@@ -492,147 +465,70 @@ Durante el proceso, podrás interactuar con la IA para **ajustar detalles**, rec
 def levantamiento_matriz_page(user:str,logo):
     st.title("Matriz de Priorización 📊")
     st.sidebar.image(logo, caption="PENTALAB",use_container_width=True)
-    area=st.sidebar.selectbox('Area', options= st.session_state.areas_existentes.keys(), index=0,disabled= st.session_state.nuevo_HU )
-    if st.session_state.areas_existentes[area]!=st.session_state.area :
-        st.session_state.area=st.session_state.areas_existentes[area]
-        st.session_state.messages = []
-        st.session_state.nuevo_HU=False
-        st.session_state.nuevo_p=False
     if "messages" not in st.session_state:
         st.session_state.messages = []
     if "nuevo_p"not in st.session_state:
         st.session_state.nuevo_p = False
-    tab1, tab2 = st.tabs(["Matriz de Priorización Automática", "Matriz Priorización Manual"])
+    tab1, tab2 = st.tabs(["Matriz Priorización / Proyecto", "Matriz Priorización /Global"])
 
     with tab1:
         texto_explicativo = """
-        📊 **Matriz de Priorización  mediante IA y estadisticas**  
+        **Matriz de Priorización por Proyecto📊**
 
-        🚀 **¿Qué puedes hacer aquí?**  
+        🚀 **¿Qué puedes hacer aquí?**
 
-        🔹 **Cargar nuevos proyectos:** Si el proyecto no está registrado, puedes ingresarlo y asignarle un nombre antes de generar la matriz.  
-        🔹 **Calcular esfuerzo y priorización:** Usamos IA y análisis estadístico para estimar el esfuerzo por prioridad de cada historia de usuario dentro de las épicas del proyecto.  
-        🔹 **Ajustar la importancia de los proyectos:**  
-        - Activando el **recuadro de importancia**, los proyectos se ordenarán de izquierda a derecha según su relevancia.  
-        - Este ajuste influirá en la generación de la **Matriz de Priorización**, asignando un peso mayor a los proyectos más importantes.  
-        - Sin embargo, el impacto puede variar: si un proyecto tiene un esfuerzo por prioridad bajo, su posición en la matriz no cambiará significativamente.  
+        - **Cargar el archivo de historias de usuario**: Subir el documento del proyecto para iniciar.
+        - **Ver la información**: Se mostrarán las épicas del proyecto y su codificación.
+        - **Puntuación por esfuerzo y priorización**: Se calculará un peso para cada épica, basado en el análisis de las historias de usuario.
+        - **Tabla editable**: Podrás ingresar las prioridades para cada épica del proyecto.
 
-        📥 **Generar y exportar la matriz**  
-        ✔ Puedes hacer clic en **"Generar Excel"** para obtener la **Matriz de Priorización** con los cálculos optimizados.  
-        ✔ Si activaste el **recuadro de importancia**, la matriz reflejará el peso asignado a cada proyecto en función de su posición.  
+        🔎 **Consulta las reglas de priorización:**
+            Para conocer los criterios utilizados, haz clic en **"Ver reglas"** en la parte izquierda.
 
-        ⚠ **Nota importante:** La optimización de la matriz se basa en cálculos de IA y estadística. La priorización final dependerá tanto del ajuste manual de importancia como del análisis de esfuerzo y prioridad.  
+        📝 **Importante**: Los cambios deben hacerse en esta plataforma. Si se editan después de descargar el Excel, **no se guardarán**.
 
+        🔒 **Guardar cambios**:
+        - Haz clic en **"Guardar"** una vez estés seguro de las prioridades.
 
-        🚀 **Optimiza la toma de decisiones estratégicas con una priorización inteligente y estructurada!**
+        🚀 ¡Optimiza tu proceso de priorización y mantén todo organizado!
         """
 
         st.write(texto_explicativo)
-        with st.expander("📜 Cargar proyecto no registrado"):
-            uploaded_file= st.file_uploader("Carga el archivo de Historias de Usuario para registrar el proyecto.")
-            if uploaded_file is not None:
-                if  uploaded_file.name.endswith('.xlsx'):
-                    crear_matriz( uploaded_file)
-                    
-                else:
-                    st.error(f"el formato del archivo no es compatible,solo se aceptan archivos Excel.")
-        confirmar_pri = st.checkbox("**Quiero priorizar mis proyectos según su importancia.** Si no marcas esta casilla, la priorización se mantendrá según la codificación del proyecto.")
-        if confirmar_pri:
-            st.write("**Ordena los proyectos según su importancia, colocando los más relevantes a la izquierda y los menos prioritarios a la derecha.**")
-            df,orden_columnas=crear_matriz_global_su_orden()
-            
-            if df is not  None:
-                if st.button("Generar  Excel"):
-                        ruta=None
-                        #ruta=Generar_doc_matriz(st.session_state["name"],df)
-                        df.index = orden_columnas[:-1]
-                        ruta= Generar_doc_matriz(st.session_state["name"], df,orden_columnas)
-                        if ruta:
-                            # Leer el archivo en modo binario
-                            with open(ruta, "rb") as archivo:
-                                archivo_binario = archivo.read()
-                            # Nombre del archivo para la descarga
-                            archivo_nombre = os.path.basename(ruta)
-
-                            # Botón de descarga
-                            st.download_button(
-                                label="📥 Haz clic aquí para descargar el archivo",
-                                data=archivo_binario,
-                                file_name=archivo_nombre,
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                            )
-
-                            # Eliminar el archivo después de la descarga
-                            os.remove(ruta)
-                            st.success("✅ El archivo ha sido descargado y eliminado correctamente.") 
-        else:
-            df=crear_matriz_globa_sug()
-            if df is not  None:
-                if st.button("Generar  Excel"):
-                        ruta=None
-                        ruta=Generar_doc_matriz(st.session_state["name"],df)
-                        if ruta:
-                            # Leer el archivo en modo binario
-                            with open(ruta, "rb") as archivo:
-                                archivo_binario = archivo.read()
-                            # Nombre del archivo para la descarga
-                            archivo_nombre = os.path.basename(ruta)
-
-                            # Botón de descarga
-                            st.download_button(
-                                label="📥 Haz clic aquí para descargar el archivo",
-                                data=archivo_binario,
-                                file_name=archivo_nombre,
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                            )
-
-                            # Eliminar el archivo después de la descarga
-                            os.remove(ruta)
-                            st.success("✅ El archivo ha sido descargado y eliminado correctamente.") 
+        uploaded_file= st.file_uploader("Carga el archivo de Hisotiras de Usuario,para empezar.")
+        if uploaded_file is not None:
+            if  uploaded_file.name.endswith('.xlsx'):
+                #file_path = f"./{uploaded_file.name}"
+                #with open(file_path, "wb") as f:
+                    #f.write(uploaded_file.getbuffer())
+                #nombre_archivo = uploaded_file.name
+                crear_matriz( uploaded_file)
+            else:
+                st.error(f"el formato del archivo no es compatible,solo se aceptan archivos Excel.")
     with tab2:
-        texto_explicativo =  """
-        **Gestión de la Matriz Global Manualmente**  
+        texto_explicativo = """
+        🚀 **¿Qué puedes hacer aquí?**
 
-        En esta ventana, puedes **cargar la matriz global** con las modificaciones previamente realizadas en las historias de usuario anteriores. Es importante que el archivo cargado tenga el **formato predeterminado**, idéntico al de la **matriz automática**, para que las modificaciones se apliquen correctamente.  
+        En el apartado podras editar la matriz de Priorización  de todos los proyectos registrados del area.
+        - Se mostrarán **todas las épicas existentes de cada proyecto** como **columnas**.
+        - Las **filas representan las epicas de los proyectos** y puedes filtrarlas según necesidad.
+        - Para una mejor visualización, puedes **agrandar la tabla** haciendo clic en la **esquina superior derecha**.
+        
+        🔎 **Consulta las reglas de priorización:**
+            Para conocer los criterios utilizados, haz clic en **"Ver reglas"** en la parte izquierda.
 
-        🔹 **Selección de proyectos:** Al seleccionar un proyecto, las **épicas de ese proyecto se desplegarán como filas**. A continuación, se compararán con las **épicas de cada otro proyecto individualmente en las columnas**. Esto te permitirá ver la priorización de cada épica en cada proyecto, facilitando la comparación entre ellos y ajustando las prioridades según sea necesario.  
+        🔒 **Guardar cambios**:
+        - Haz clic en **"Guardar"** una vez estés seguro de las prioridades.
 
-        🔹 **Visualización de épicas:** Las **épicas del proyecto seleccionado** se muestran en filas, mientras que las épicas de otros proyectos se despliegan en las columnas correspondientes. Esta estructura permite una comparación directa de las prioridades de las épicas entre todos los proyectos.  
+        💡 **Recuerda**: Realiza todas las ediciones en esta plataforma, ya que los cambios fuera de ella **no se reflejarán**.
 
-        🔹 **Guardado de cambios:** Después de realizar los ajustes correspondientes, es **fundamental guardar los cambios** antes de exportar la matriz a Excel. Además, **debes guardar los cambios antes de cambiar el filtro**, para evitar perder cualquier modificación.  
+        📌 **Tip:** En cada columna puedes hacer clic en los **tres puntitos** para **ordenar** los datos o **fijar la columna** según tu necesidad.
 
-        🔹 **Exportación a Excel:** Una vez que hayas terminado con las modificaciones, puedes hacer clic en el botón **"Exportar a Excel"** para generar la matriz actualizada y descargable.  
-
-        ⚠ **Recuerda siempre guardar los cambios antes de exportar o cambiar el filtro** para asegurarte de que no se pierda ninguna modificación realizada.
+        🚀 ¡Optimiza tu proceso de priorización y mantén todo organizado!
         """
         st.write(texto_explicativo)
-        with st.expander("📜 Cargar Matriz global"):
-            if 'files_id' not in st.session_state:
-                st.session_state['files_id'] = []
-            if 'processed_files' not in st.session_state:
-                st.session_state['processed_files'] = []
-            uploaded_file= st.file_uploader("Carga el archivo de la matriz global.", key="excel_matriz")
-            if uploaded_file is not None:
-                if  uploaded_file.name.endswith('.xlsx'):
-                    #insertar_matriz_producto(matriz_df,nombre_proyecto)
-                    #crear_matriz( uploaded_file)
-                     if uploaded_file.file_id not in st.session_state['processed_files']:
-                        st.session_state['processed_files'].append(uploaded_file.file_id)
-                        st.session_state['files_id'].append(uploaded_file.file_id)
-                        cargar_matriz_global(uploaded_file)
-                    
-                else:
-                    st.error(f"el formato del archivo no es compatible,solo se aceptan archivos Excel.")
         crear_matriz_global()
-def mostrar_chats_y_codificaciones(logo):
+def mostrar_chats_y_codificaciones(user, AI):
     st.subheader("Mis Proyectos")
-    st.sidebar.image(logo, caption="PENTALAB",use_container_width=True)
-    area=st.sidebar.selectbox('Area', options= st.session_state.areas_existentes.keys(), index=0,disabled= st.session_state.nuevo_HU )
-    if  st.session_state.areas_existentes[area]!=st.session_state.area :
-        st.session_state.area=st.session_state.areas_existentes[area]
-        st.session_state.messages = []
-        st.session_state.nuevo_HU=False
-        st.session_state.nuevo_p=False
     proyectos=obtener_proyectos(st.session_state.area)
     # Diccionario para agrupar por proyecto
     proyectos_agrupados = defaultdict(lambda: {"Nombre_proyecto": "", "Proyecto": "", "Epicas": []})
@@ -723,16 +619,14 @@ def leer_archivo_pdf(ruta_archivo):
 def  sub_main(cookie_controller):
     logo_path = r"media/cohete.png"  # Reemplaza con la ruta de tu archivo de imagen
     logo = Image.open(logo_path)
-    if "areas_existentes" not in st.session_state:
-        resultado=list(Obtener_area(st.session_state["name"]))
-        st.session_state.areas_existentes = {i["Area"]: i["CodArea"] for i in resultado}
     if "area" not in st.session_state:
+        resultado=list(Obtener_area(st.session_state["name"]))
+        if resultado  :
+            st.session_state.area = resultado[0]["CodArea"]
+        else:
             st.session_state.area=None
     if "last_AI" not in st.query_params:
         st.query_params["last_AI"]  = False
-    if "nuevo_HU" not in st.session_state:
-        st.session_state.nuevo_HU = False
-
     # Mostrar el contenido de la página activa
     if st.query_params["page"]  == "User_history":
         user_history_page(st.session_state["name"],logo)
@@ -741,7 +635,7 @@ def  sub_main(cookie_controller):
     elif st.query_params["page"]  == "M_Priorizacion":
         levantamiento_matriz_page(st.session_state["name"],logo)
     elif  st.query_params["page"]  == "Proyectos_Codificaciones":
-        mostrar_chats_y_codificaciones( logo)
+        mostrar_chats_y_codificaciones(st.session_state["name"], logo)
     # Navegación entre ventanas
     with st.sidebar:
         # Usar Markdown y CSS para darle forma circular a la imagen en el sidebar
@@ -793,7 +687,7 @@ def  sub_main(cookie_controller):
 
 # Configuración de la app
 st.set_page_config(page_title="SCRUM IA", page_icon="🤖")
-#st.set_page_config(page_title="SCRUM IA", page_icon="🤖",layout="wide")
+st.set_page_config(page_title="SCRUM IA", page_icon="🤖",layout="wide")
 if "page" not in st.query_params:
     #st.query_params.page=""
     st.query_params["page"]="L_Proyectos"

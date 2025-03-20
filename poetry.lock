@@ -3030,6 +3030,20 @@ cryptography = "*"
 streamlit = ">=0.84"
 
 [[package]]
+name = "streamlit-sortables"
+version = "0.3.1"
+description = "A Streamlit component to provide sortable list."
+optional = false
+python-versions = "!=2.7.*,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,!=3.7.*,!=3.8.*,>=3.9"
+files = [
+    {file = "streamlit_sortables-0.3.1-py3-none-any.whl", hash = "sha256:1847b2fa2041762b6442e21224bd8c0316c5412e4eb3a38fa748cf7ced834d49"},
+    {file = "streamlit_sortables-0.3.1.tar.gz", hash = "sha256:9bed78f4407f2b9b1ddead8b6459d1af839aab427b7b5fe4c091e6870630acfe"},
+]
+
+[package.dependencies]
+streamlit = ">=1.0.0"
+
+[[package]]
 name = "tabulate"
 version = "0.9.0"
 description = "Pretty-print tabular data"
@@ -3460,4 +3474,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "47444d8f99565b5945699cd8f694e1c4f430258d006cec1e89ddea9fc4ec33db"
+content-hash = "4bc61f3d3eb85e39cd3b02da60ea2126344d166ab526aadd8e7cf032743c843b"

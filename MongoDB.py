@@ -6,6 +6,7 @@ import pandas as pd
 from datetime import datetime
 from collections import defaultdict
 
+import streamlit as st
 # Conexión a MongoDB
 uri = "mongodb://dev_jhurtado:Pka12msE1b2qO1@192.168.193.5:27017/AIProjects?authSource=admin"
 client = MongoClient(uri)
@@ -92,7 +93,7 @@ def Cargar_HistorialDB(usuario, chat_id,AI):
         print(f"Error al cargar el historial: {str(e)}")
         return []  # Retorna una lista vacía en caso de error
 
-def Obtener_Nombres_ChatDB(usuario,AI):
+def Obtener_Nombres_ChatDB(usuario,AI,area):
     """
     Obtiene la lista de chat_id asociados con un usuario desde MongoDB.
 
@@ -108,7 +109,7 @@ def Obtener_Nombres_ChatDB(usuario,AI):
         elif AI=="L_Proyectos":
             chat=db["Chats_L_Proyectos"]
         # Consulta para obtener documentos del usuario
-        documentos = chat.find({"usuario": usuario}, {"chat_id": 1, "_id": 0}).sort("_id", -1) 
+        documentos = chat.find({"usuario": usuario, "area":area}, {"chat_id": 1, "_id": 0}).sort("_id", -1) 
         # Extraer los nombres de los chat_id
         nombres_chats = [doc["chat_id"] for doc in documentos]
         # Agregar "nuevo_proyecto" al inicio de la lista como en el código original
@@ -119,7 +120,7 @@ def Obtener_Nombres_ChatDB(usuario,AI):
         return ["nuevo_proyecto"]  # Devuelve solo "nuevo_proyecto" en caso de error
 
 
-def guardar_nuevo_chatDB(usuario, chat_id, mensajes,AI):
+def guardar_nuevo_chatDB(usuario, chat_id, mensajes,AI,area):
     if AI=="U_History":
         chat=  db["Chats_U_History"]
     elif AI=="L_Proyectos":
@@ -140,11 +141,12 @@ def guardar_nuevo_chatDB(usuario, chat_id, mensajes,AI):
         documento = {
             "usuario": usuario,
             "chat_id": chat_id,
+            "area":area,
             "contenido": mensajes  # Almacena los mensajes del chat
         }
         
         # Verificar si ya existe un chat con el mismo usuario y chat_id
-        if chat.find_one({"usuario": usuario, "chat_id": chat_id}):
+        if chat.find_one({"usuario": usuario, "chat_id": chat_id,"area":area}):
             return f"El chat con ID '{chat_id}' para el usuario '{usuario}' ya existe. No se ha guardado."
 
         # Insertar el nuevo chat en la colección
@@ -153,7 +155,7 @@ def guardar_nuevo_chatDB(usuario, chat_id, mensajes,AI):
     except Exception as e:
         return f"Error al guardar el chat: {str(e)}"
 
-def borrar_chatDB(usuario, chat_id,AI):
+def borrar_chatDB(usuario, chat_id,AI,area):
     """
     Borra un chat guardado en MongoDB.
 
@@ -170,7 +172,7 @@ def borrar_chatDB(usuario, chat_id,AI):
         chat=db["Chats_L_Proyectos"]
     try:
         # Buscar y eliminar el chat correspondiente
-        resultado = chat.delete_one({"usuario": usuario, "chat_id": chat_id})
+        resultado = chat.delete_one({"usuario": usuario, "chat_id": chat_id,"area":area})
         
         if resultado.deleted_count > 0:
             return f"El chat con ID '{chat_id}' del usuario '{usuario}' se ha eliminado correctamente."
@@ -318,7 +320,7 @@ def obtener_archivo_excel_gridfs(filename):
     except Exception as e:
         print(f"Error al recuperar el archivo: {e}")
         return None, None
-def  insertar_matriz_producto(df,proyecto):
+def  insertar_matriz_producto1(df,proyecto):
 
     # Conexión a MongoDB con autenticación
     db = client["AIProjects"]  # Base de datos
@@ -333,16 +335,177 @@ def  insertar_matriz_producto(df,proyecto):
     # Insertar los datos en MongoDB
     collection.insert_many(data_dict)
     print("Datos de la matriz  guardados en MongoDB ")
+
+def  insertar_matriz_producto(df,proyecto):
+    db = client["AIProjects"]  # Base de datos
+    collection = db["matriz_Pri"]  # Colección donde se guardarán los datos
+    lista_orden,proyectos_ord=obtener_orden_matriz(proyecto)
+    # Suponiendo que ya tienes un DataFrame llamado df
+    data_dict = df.to_dict(orient="records")
+        # Estructura para almacenar los datos organizados por proyecto
+    proyectos_dict = {}
+
+    for i, item in enumerate(data_dict):  # Identificador del proyecto
+        epica_nombre = df.index[i]  # Nombre de la épica
+
+        # Obtener el id_epica según la lista_orden
+        id_epica = lista_orden.index(epica_nombre) + 1 if epica_nombre in lista_orden else None
+
+        # Solo procesamos si la épica está en la lista_orden
+        if id_epica is not None:
+            # Removemos los campos innecesarios
+            valores = {key: value for key, value in item.items() if key not in ["proyecto", "epica", "_id"]}
+
+            # Si el proyecto aún no está en el diccionario, lo creamos
+            if proyecto not in proyectos_dict:
+                proyectos_dict[proyecto] = {
+                    "proyecto": proyecto,
+                    "epicas": []
+                }
+
+            # Transformamos las claves de valores a id_epica en lugar de nombres
+            valores_transformados = []
+            for nombre, valor in valores.items():
+                id_epica_valor = lista_orden.index(nombre) + 1 if nombre in lista_orden else None
+                if id_epica_valor is not None:
+                    valores_transformados.append({"proyecto": proyecto,"id_epica": id_epica_valor, "valor": valor})
+
+            # Agregar la épica a la lista de épicas del proyecto
+            proyectos_dict[proyecto]["epicas"].append({
+                "id_epica": id_epica,  # Se usa el índice de la lista como id_epica
+                "valores": valores_transformados
+            })
+
+    # Convertir el diccionario en una lista de proyectos
+    proyectos_list = list(proyectos_dict.values())
+
+    # Insertar los datos en MongoDB
+    collection.insert_many(proyectos_list)
+    print("Datos de la matriz guardados en MongoDB")
+def  insertar_matriz_producto_multi(df,proyectos):
+    db = client["AIProjects"]  # Base de datos
+    collection = db["matriz_Pri"]  # Colección donde se guardarán los datos
+    #lista_orden,proyectos_ord=obtener_orden_matriz(proyecto)
+    # Suponiendo que ya tienes un DataFrame llamado df
+    # Suponiendo que tienes un DataFrame llamado df
+    columnas_ordenadas = df.columns  # Guardamos el orden original de las columnas
+
+    df_dict = {proyecto: df_proyecto[columnas_ordenadas] for proyecto, df_proyecto in df.groupby("proyecto")}
+        # Estructura para almacenar los datos organizados por proyecto
+    for proyecto in proyectos:
+        #st.dataframe(df_dict[proyecto])
+        data_dict = df_dict[proyecto].to_dict(orient="records")
+        lista_orden,proyectos_ord=obtener_orden_matriz(proyecto)
+        borrar_proyecto_matriz(proyecto)
+        proyectos_dict = {}
+        for i, item in enumerate(data_dict):  # Identificador del proyecto
+            epica_nombre = df_dict[proyecto].index[i]  # Nombre de la épica
+            id_epica = lista_orden.index(epica_nombre) + 1 if epica_nombre in lista_orden else None
+
+            # Removemos los campos innecesarios
+            valores = {key: value for key, value in item.items() if key not in ["proyecto", "epica", "_id"]}
+
+            # Si el proyecto aún no está en el diccionario, lo creamos
+            if proyecto not in proyectos_dict:
+                proyectos_dict[proyecto] = {
+                    "proyecto": proyecto,
+                    "epicas": []
+                }
+            # Transformamos las claves de valores a id_epica en lugar de nombres
+            valores_transformados = []
+            for nombre, valor in valores.items():
+                if valor is not None and not pd.isna(valor):  
+                    proyecto1,id_epica=nombre.split("-EP")
+                    valores_transformados.append({"proyecto": proyecto1,"id_epica":int( id_epica), "valor": valor})
+            # Agregar la épica a la lista de épicas del proyecto
+            proyectos_dict[proyecto]["epicas"].append({
+                "id_epica": i+1,  # Se usa el índice de la lista como id_epica
+                "valores": valores_transformados
+            })
+
+        # Convertir el diccionario en una lista de proyectos
+        proyectos_list = list(proyectos_dict.values())
+        print( proyectos_list)
+        # Insertar los datos en MongoDB
+        collection.insert_many(proyectos_list)
+    print("Datos de la matriz guardados en MongoDB")
+
 def  consultar_matriz_producto(area):
     db = client["AIProjects"]  # Base de datos
     collection = db["matriz_Pri"]  # Colección donde se guardarán los datos
     resultado = collection.find({"proyecto": {"$regex": area, "$options": "i"}})
     return resultado
+def  consultar_matriz_producto_global(area,epicas_Proyecto,proyectos_seleccionados,epicas_proyecto_codigo,proyectos_ord):
+        db = client["AIProjects"]
+        collection = db["matriz_Pri"]
+        # Consulta a MongoDB
+        resultado = collection.find({"proyecto": {"$regex": area, "$options": "i"}})
+        proyectos_unicos = []
+        for valor in proyectos_ord:
+            if valor not in proyectos_unicos:
+                proyectos_unicos.append(valor)
+        data = []
+        resultado  = list(resultado)
+# Ordenar los resultados según el orden en 'proyectos_unicos'
+        resultado  = sorted(resultado , key=lambda doc: proyectos_unicos.index(doc['proyecto']) if doc['proyecto'] in proyectos_unicos else float('inf'))
+        for doc in resultado:
+            proyecto = doc["proyecto"]  # Nombre del proyecto
+            if proyecto in proyectos_seleccionados:
+                #lista_epicas=epicas_Proyecto[proyecto]
+                for epica in sorted(doc.get("epicas", []), key=lambda x: x['id_epica']):
+                    lista_epicas=epicas_Proyecto[proyecto]
+                    fila = {
+                        "proyecto": proyecto,
+                        "id_epica": lista_epicas[epica["id_epica"]-1]
+                    }
+                    # Extraer los valores de cada épica y guardarlos en columnas dinámicas
+                    for valor in sorted(epica.get("valores", []), key=lambda x: x['id_epica']):
+                        #print(valor)
+                        lista_epicas=epicas_Proyecto[valor["proyecto"]]
+                        lista_epicas_C=epicas_proyecto_codigo[valor["proyecto"]]
+                        #print(lista_epicas)
+                        columna =lista_epicas_C[lista_epicas[valor['id_epica']-1]]
+                        fila[columna] = valor["valor"]
+                    
+                    data.append(fila)
+
+        # Crear DataFrame
+        #print(data)
+        df = pd.DataFrame(data)
+
+        # Llenar valores faltantes con 0
+        #df.fillna(0, inplace=True)
+        return df
+
 
 def actualizar_un_elemento_matriz(filtro,actualizacion):
     db = client["AIProjects"]  # Base de datos
     collection = db["matriz_Pri"]  # Colección donde se guardarán los datos
     collection.update_one(filtro, actualizacion, upsert=True)
+def actualizar_un_elemento_matriz_n(index,dic,filtro):
+    db = client["AIProjects"]  # Base de datos
+    collection = db["matriz_Pri"]  # Colección donde se guardarán los datos
+    # Actualización usando operadores posicionales
+    actualizacion = {
+        "$set": {
+            "epicas.$[epica].valores.$[valor].valor": int(dic["valor"])  # Cambiar el valor
+        }
+    }
+
+    # Filtros para los arrays anidados
+    array_filters = [
+        {"epica.id_epica": dic["id_epica"]},  # Filtra la epica correcta
+        {"valor.proyecto":  dic["proyecto"]}  # Filtra dentro de valores
+    ]
+    print(actualizacion)
+    resultado = collection.update_one(filtro, actualizacion, array_filters=array_filters)
+    print(resultado)
+    # Verificar si se actualizó correctamente
+    if resultado.modified_count > 0:
+        print("Valor actualizado correctamente.")
+    else:
+        print("No se encontró el documento para actualizar.")
+
 def consultar_matriz_exis_proyecto(proyecto):
     db = client["AIProjects"]  # Base de datos
     collection = db["matriz_Pri"]  # Colección donde se guardarán los datos
@@ -353,13 +516,23 @@ def consultar_matriz_exis_proyecto(proyecto):
         return True  # Retorna True si hay coincidencias, False si no
     else:
         return False
+def consultar_matriz_exis_proyecto_nombre(proyecto):
+    db = client["AIProjects"]  # Base de datos
+    collection = db["cod_proyectos"]  # Colección donde se guardarán los datos
+    resultado=None
+    # Buscar coincidencias que contengan la palabra "ant" (insensible a mayúsculas)
+    resultado = collection.find_one({"Nombre_proyecto": {"$regex": proyecto, "$options": "i"}})
+    if resultado is not None:
+        return True  # Retorna True si hay coincidencias, False si no
+    else:
+        return False
 
-def agregar_info_pro(proyectos_array, epicas_agregar,nombre,nombre_proyecto ):
+def agregar_info_pro(proyectos_array, epicas_agregar,nombre,nombre_proyecto,total_prioridad,df_prioridad):
     db = client["AIProjects"]  
     collection = db["cod_proyectos"]  
     # Crear DataFrame solo con las columnas necesarias
     df_filtered = pd.DataFrame({'Código Proyecto': proyectos_array, 'Nombre Épica': epicas_agregar})
-
+    #st.dataframe(df_prioridad)
     # Extraer Año, Número de Proyecto y Número de Épica usando regex
     df_filtered[['Año', 'Número_Proyecto', 'Número_Épica']] = df_filtered['Código Proyecto'].str.extract(r'AN-(\d{4})-(\d+)-EP(\d+)')
     df_filtered["Proyecto"]=nombre_proyecto
@@ -367,6 +540,10 @@ def agregar_info_pro(proyectos_array, epicas_agregar,nombre,nombre_proyecto ):
     df_filtered[['Año', 'Número_Proyecto', 'Número_Épica']] = df_filtered[['Año', 'Número_Proyecto', 'Número_Épica']].apply(pd.to_numeric)
     df_filtered['Nombre Épica'] = epicas_agregar
     df_filtered['Nombre_proyecto'] = nombre
+    df_filtered['Puntuacion_proyecto']=total_prioridad
+    df_filtered = df_filtered.merge(df_prioridad, left_on='Nombre Épica', right_index=True, how='left').drop(columns=['Estimación de Esfuerzo', 'Prioridad(Valor)'], errors='ignore')
+
+    #st.dataframe(df_filtered)
     # Convertir DataFrame a lista de diccionarios para MongoDB
     documents = df_filtered.to_dict(orient='records')
 
@@ -429,7 +606,15 @@ def obtener_proyectos(area):
     # Obtener los datos de la colección
     data = list(collection.find({"Proyecto": {"$regex": area, "$options": "i"}}))
     return data
-
+def borrar_proyecto_matriz(proyecto):
+    db = client["AIProjects"]
+    collection = db["matriz_Pri"]
+    filtro = {"proyecto": proyecto}
+    result = collection.delete_many(filtro)
+    if result.deleted_count > 0:
+            print("✅ proyecto eliminado correctamente de la codificacion..")
+    else:
+            print("⚠️ No se encontró el proyecto en la codificacion.")
 
 def borrar_proyecto(proyecto):
     
@@ -538,3 +723,209 @@ def consultar_epicas_exis_proyecto(epicas):
         if resultado is not None:
             return True,epica  # Retorna True si hay coincidencias, False si no
     return  False,None
+def consultar_epicas_por_codigo_proyecto(codigos_proyecto):
+    db = client["AIProjects"]  # Base de datos
+    collection = db["cod_proyectos"]  # Colección donde se guardarán los datos
+    epicas_validas = {}  # Lista para almacenar las épicas válidas
+
+    for codigo_proyecto in codigos_proyecto:
+        print(f"Consultando proyecto: {codigo_proyecto}")
+        # Buscar las épicas asociadas a un Código Proyecto
+        resultado = collection.find({"Proyecto": codigo_proyecto})
+        
+        for doc in resultado:
+            # Añadir la épica asociada a la lista de épicas válidas
+            epicas_validas.append(doc["Nombre Épica"])
+    
+    return epicas_validas
+def extraer_epicas_por_codigo_proyecto(codigos_proyecto):
+    db = client["AIProjects"]  # Base de datos
+    collection = db["cod_proyectos"]  # Colección donde se guardarán los datos
+    epicas_validas = {}  # Lista para almacenar las épicas válidas
+    for codigo_proyecto in codigos_proyecto:
+        epicas_P=[]
+        print(f"Consultando proyecto: {codigo_proyecto}")
+        # Buscar las épicas asociadas a un Código Proyecto
+        resultado = collection.find({"Proyecto": codigo_proyecto})
+        
+        for doc in resultado:
+            # Añadir la épica asociada a la lista de épicas válidas
+            epicas_P.append(doc["Nombre Épica"])
+
+        epicas_validas[codigo_proyecto]=epicas_P
+    
+    return epicas_validas
+def extraer_codigo_epicas_por_codigo_proyecto(codigos_proyecto):
+    db = client["AIProjects"]  # Base de datos
+    collection = db["cod_proyectos"]  # Colección donde se guardarán los datos
+    epicas_validas = {}  # Diccionario para almacenar las épicas válida
+
+    for codigo_proyecto in codigos_proyecto:
+        epicas_P = {}  # Diccionario para almacenar las épicas de un proyecto
+        print(f"Consultando proyecto: {codigo_proyecto}")
+        
+        # Buscar las épicas asociadas a un Código Proyecto
+        resultado = collection.find({"Proyecto": codigo_proyecto})
+        
+        for doc in resultado:
+            # Añadir la épica al diccionario del proyecto
+            epicas_P[doc["Nombre Épica"]] = doc["Código Proyecto"]
+        epicas_P_ordenadas = dict(sorted(epicas_P.items(), key=lambda item: int(item[1].split('-')[-1].replace('EP', ''))))
+    # Guardar las épicas ordenadas del proyecto en el diccionario final
+        epicas_validas[codigo_proyecto] = epicas_P_ordenadas
+        # Guardar las épicas del proyecto en el diccionario final
+    return epicas_validas
+
+def obtener_proyectos_puntuacion1(area):
+    db = client["AIProjects"]  # Base de datos
+    collection = db["cod_proyectos"]  # Colección donde se guardarán los datos
+     # Obtener los proyectos que coincidan con el área dada (con una búsqueda insensible al caso)
+    data = list(collection.find({"Proyecto": {"$regex": area, "$options": "i"}}))
+
+    # Crear un diccionario para almacenar los proyectos con su puntuación única
+    proyectos_unicos = {}
+
+    for doc in data:
+        proyecto = doc["Proyecto"]
+        puntuacion = doc["Puntuacion_proyecto"]
+
+        # Solo añadir el proyecto si aún no existe en el diccionario
+        if proyecto not in proyectos_unicos:
+            proyectos_unicos[proyecto] = puntuacion
+
+    # Convertir a DataFrame
+    df = pd.DataFrame(list(proyectos_unicos.items()), columns=["Proyecto", "Puntuacion"])
+    suma_puntuacion = df['Puntuacion'].sum()
+
+    # Convertir el DataFrame a diccionario
+    df_dict = df.to_dict(orient="records")
+
+    # Devolver tanto los proyectos como la suma
+    return df_dict, suma_puntuacion
+def obtener_proyectos_puntuacion(area,epicas):
+    db = client["AIProjects"]  # Asegúrate de que el nombre de tu base de datos sea correcto
+    collection = db["cod_proyectos"]  # Asegúrate de que el nombre de tu colección sea correcto
+    # Crear una nueva matriz con el mismo orden de filas y columnas
+    # Obtener proyectos de MongoDB
+    proyectos = list(collection.find({"Proyecto": {"$regex": area, "$options": "i"}}))  # Esto puede ser ajustado si tienes un filtro específico
+    #proyectos=proyectos.drop(columns=['_id'])
+    # Iterar sobre los proyectos y calcular los valores de la nueva matriz
+    for proyecto in proyectos:
+        # Obtener Prioridad_x_Esfuerzo y Puntuacion_proyecto
+        prioridad_x_esfuerzo = proyecto["Prioridad_x_Esfuerzo"]
+        puntuacion_proyecto = proyecto["Puntuacion_proyecto"]
+        
+        # Calcular la suma de puntuaciones de todos los proyectos
+    suma_puntuacion = sum(set(p["Puntuacion_proyecto"] for p in proyectos))
+
+    # Crear una matriz vacía con los nombres de las épicas como filas y columnas
+    df_matriz = pd.DataFrame(0.0, index=epicas, columns=epicas)
+    proyectos=pd.DataFrame( proyectos)
+    #st.dataframe(proyectos)
+    # Iterar sobre las filas y columnas de la matriz para calcular los valores
+
+    for fila in epicas:
+        esfuerzo_fila = proyectos.loc[proyectos["Nombre Épica"] == fila, "Prioridad_x_Esfuerzo"].values[0]
+        puntuacion_proyecto_fila = proyectos.loc[proyectos["Nombre Épica"] == fila, "Puntuacion_proyecto"].values[0]
+        
+        for columna in epicas:
+            esfuerzo_columna = proyectos.loc[proyectos["Nombre Épica"] == columna, "Prioridad_x_Esfuerzo"].values[0]
+
+            # Aplicar la fórmula dada
+            if esfuerzo_columna != 0:  # Evitar divisiones por cero
+                valor_celda = (esfuerzo_fila * puntuacion_proyecto_fila) / (esfuerzo_columna * suma_puntuacion)
+                df_matriz.loc[fila, columna] = valor_celda
+    # Crear una matriz vacía con los nombres de las épicas como filas y columnas
+    df_matriz_nueva = pd.DataFrame(0.0, index=epicas, columns=epicas)
+    proyectos = pd.DataFrame(proyectos)
+
+    # Iterar sobre las filas y columnas de la matriz para calcular los valores
+    for fila in epicas:
+        esfuerzo_fila = proyectos.loc[proyectos["Nombre Épica"] == fila, "Prioridad_x_Esfuerzo"].values[0]
+        puntuacion_proyecto_fila = proyectos.loc[proyectos["Nombre Épica"] == fila, "Puntuacion_proyecto"].values[0]
+        
+        for columna in epicas:
+            esfuerzo_columna = proyectos.loc[proyectos["Nombre Épica"] == columna, "Prioridad_x_Esfuerzo"].values[0]
+
+            # Aplicar la nueva fórmula, evitando divisiones por cero
+            if esfuerzo_columna != 0 and puntuacion_proyecto_fila != 0:
+                valor_celda = (esfuerzo_fila * esfuerzo_fila) / (esfuerzo_columna * puntuacion_proyecto_fila)
+                df_matriz_nueva.loc[fila, columna] = valor_celda
+
+    # Mostrar la nueva matriz
+    #st.dataframe(df_matriz_nueva)
+    # Mostrar el DataFrame resultado
+    return df_matriz,df_matriz_nueva
+def obtener_proyectos_puntuacion_codigo(area,cod_epicas,proyectos_ord):
+    db = client["AIProjects"]  # Asegúrate de que el nombre de tu base de datos sea correcto
+    collection = db["cod_proyectos"]  # Asegúrate de que el nombre de tu colección sea correcto
+    # Crear una nueva matriz con el mismo orden de filas y columnas
+    # Obtener proyectos de MongoDB
+    proyectos = list(collection.find({"Proyecto": {"$regex": area, "$options": "i"}}))  # Esto puede ser ajustado si tienes un filtro específico
+    #proyectos=proyectos.drop(columns=['_id'])
+    # Iterar sobre los proyectos y calcular los valores de la nueva matriz
+        # Calcular la suma de puntuaciones de todos los proyectos
+    suma_puntuacion = sum(set(p["Puntuacion_proyecto"] for p in proyectos))
+    proyectos_unicos = []
+    cod_epicas_list=[]
+
+    for valor in proyectos_ord:
+        if valor not in proyectos_unicos:
+            proyectos_unicos.append(valor)
+    
+    for a in proyectos_unicos:
+        for u in list(cod_epicas.get(a).values()):
+            cod_epicas_list.append(u)
+    # Crear una matriz vacía con los nombres de las épicas como filas y columnas
+    df_matriz = pd.DataFrame(0.0, index=cod_epicas_list, columns=cod_epicas_list)
+    proyectos=pd.DataFrame( proyectos)
+    # Iterar sobre las filas y columnas de la matriz para calcular los valores
+
+    for fila in cod_epicas_list:
+        esfuerzo_fila = proyectos.loc[proyectos["Código Proyecto"] == fila, "Prioridad_x_Esfuerzo"].values[0]
+        puntuacion_proyecto_fila = proyectos.loc[proyectos["Código Proyecto"] == fila, "Puntuacion_proyecto"].values[0]
+        
+        for columna in cod_epicas_list:
+            esfuerzo_columna = proyectos.loc[proyectos["Código Proyecto"] == columna, "Prioridad_x_Esfuerzo"].values[0]
+
+            # Aplicar la fórmula dada
+            if esfuerzo_columna != 0:  # Evitar divisiones por cero
+                valor_celda = (esfuerzo_fila * puntuacion_proyecto_fila) / (esfuerzo_columna * suma_puntuacion)
+                df_matriz.loc[fila, columna] = valor_celda
+    # Crear una matriz vacía con los nombres de las épicas como filas y columnas
+    df_matriz_nueva = pd.DataFrame(0.0, index=cod_epicas_list, columns=cod_epicas_list)
+    proyectos = pd.DataFrame(proyectos)
+
+    # Iterar sobre las filas y columnas de la matriz para calcular los valores
+    for fila in cod_epicas_list:
+        esfuerzo_fila = proyectos.loc[proyectos["Código Proyecto"] == fila, "Prioridad_x_Esfuerzo"].values[0]
+        puntuacion_proyecto_fila = proyectos.loc[proyectos["Código Proyecto"] == fila, "Puntuacion_proyecto"].values[0]
+        
+        for columna in cod_epicas_list:
+            esfuerzo_columna = proyectos.loc[proyectos["Código Proyecto"] == columna, "Prioridad_x_Esfuerzo"].values[0]
+
+            # Aplicar la nueva fórmula, evitando divisiones por cero
+            if esfuerzo_columna != 0 and puntuacion_proyecto_fila != 0:
+                valor_celda = (esfuerzo_fila * esfuerzo_fila) / (esfuerzo_columna * puntuacion_proyecto_fila)
+                df_matriz_nueva.loc[fila, columna] = valor_celda
+
+    # Mostrar la nueva matriz
+    #st.dataframe(df_matriz_nueva)
+    # Mostrar el DataFrame resultado
+    return df_matriz,df_matriz_nueva
+    
+def consultar_nombres_proyectos(codigos_proyecto):
+    db = client["AIProjects"]  # Nombre de la base de datos
+    collection = db["cod_proyectos"]  # Nombre de la colección
+
+    nombres_proyectos = {}  # Diccionario para almacenar resultados
+
+    for codigo in codigos_proyecto:
+        resultado = collection.find_one({"Proyecto": codigo}, {"Nombre_proyecto": 1, "_id": 0})
+        
+        if resultado:  
+            nombres_proyectos[codigo] = resultado["Nombre_proyecto"]
+        else:
+            nombres_proyectos[codigo] = None  # O podrías poner un string como "No encontrado"
+
+    return nombres_proyectos
