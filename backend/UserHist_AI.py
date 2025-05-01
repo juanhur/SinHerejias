@@ -13,8 +13,26 @@ from typing import Type  # Agregar esta importación
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 import streamlit as st
 
+from typing import Optional
+from langchain_core.utils.utils import secret_from_env
+from pydantic import Field, SecretStr
+
 _ = load_dotenv(find_dotenv())
 openai_api_key = os.environ["OPENAI_API_KEY"]
+class ChatOpenRouter(ChatOpenAI):
+    openai_api_key: Optional[SecretStr] = Field(
+        alias="api_key", default_factory=secret_from_env("OPENROUTER_API_KEY", default=None)
+    )
+    @property
+    def lc_secrets(self) -> dict[str, str]:
+        return {"openai_api_key": "OPENROUTER_API_KEY"}
+
+    def __init__(self,
+                 openai_api_key: Optional[str] = None,
+                 **kwargs):
+        openai_api_key = openai_api_key or os.environ.get("OPENROUTER_API_KEY")
+        super().__init__(base_url="https://openrouter.ai/api/v1", openai_api_key=openai_api_key, **kwargs)
+
 def Cargar_Historial(session_Id,ruta):
     ruta_archivo=f"chats{ruta}{session_Id}.json"
         # Cargar el historial desde el archivo JSON
@@ -317,7 +335,8 @@ Instrucciones Adicionales:
     )
 
     # Initialize agent and executor
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2,timeout=200)
+    #llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2,timeout=200)
+    llm=ChatOpenRouter(model_name="openai/gpt-4o-mini", temperature=0.2,timeout=200)
     tools = []
     agent1 = create_structured_chat_agent(llm, tools, USER_HIS_PROMPTAI)
     agent_executor1 = AgentExecutor(agent=agent1, tools=tools, max_iterations=2, verbose=True,handle_parsing_errors=True)
@@ -330,7 +349,8 @@ Instrucciones Adicionales:
     )
     return response
 # Initialize agent and executor
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.5,timeout=300)
+#llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.5,timeout=300)
+llm=ChatOpenRouter(model_name="openai/gpt-4o-mini", temperature=0.5,timeout=300)
 tools = [DOCs]
 agent = create_tool_calling_agent(llm, tools, USER_HIS_PROMPT)
 agent_executor = AgentExecutor.from_agent_and_tools(agent=agent, tools=tools, max_iterations=1,early_stopping_method='generate', verbose=True)
@@ -345,7 +365,8 @@ def Agente_UH_AI(input: str, chat:str,historial:str,user:str):
             {"input": input,"historial":chat_history,"chat_name":chat,"usuario":user},
         )
         if "intermediate_steps" in response:
-            llm2 = ChatOpenAI(model="gpt-4o-mini", temperature=0.2,timeout=100)#timeout=30  # Tiempo de espera en segundos
+            #llm2 = ChatOpenAI(model="gpt-4o-mini", temperature=0.2,timeout=100)#timeout=30  # Tiempo de espera en segundos
+            llm2=ChatOpenRouter(model_name="openai/gpt-4o-mini", temperature=0.2,timeout=100)
             print("No se obtuvo respuesta en las iteraciones; se intentará una última vez.")
             secondary_response = LAST_PROMPT | llm2 | StrOutputParser()
             final_output = secondary_response.invoke(
