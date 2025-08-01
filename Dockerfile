@@ -16,10 +16,6 @@ RUN pip install --no-cache-dir poetry
 # Deshabilita la creación de entornos virtuales y luego instala las dependencias globalmente
 RUN poetry config virtualenvs.create false && poetry install --no-root --no-interaction --no-ansi
 
-# Copia el resto del código del proyecto
-COPY . .
-COPY agent.py /usr/local/lib/python3.11/site-packages/langchain/agents/agent.py
-
 
 # Expone el puerto 9191 para Streamlit
 EXPOSE 9191
